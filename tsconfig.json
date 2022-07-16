@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2016", //  目标语法                                 /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
+    "lib": ["esnext", "DOM"], // 支持的类库                /* Specify a set of bundled library declaration files that describe the target runtime environment. */
+    "jsx": "preserve",  // 不转义jsx                      /* Specify what JSX code is generated. */
+    "module": "esnext", // 模块格式                       /* Specify what module code is generated. */
+    "moduleResolution": "node", // 模块解析方式
+    "resolveJsonModule": true,  // 解析json模块           /* Enable importing .json files. */
+    "sourceMap": true,                                /* Create source map files for emitted JavaScript files. */
+    "outDir": "dist", // 输出的目录                        /* Specify an output folder for all emitted files. */
+    "esModuleInterop": true,  // 允许通过es6语法引入commonjs模块     /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
+    "strict": false,                                     /* Enable all strict type-checking options. */
+    "types": ["jest"],
+    "baseUrl": ".",
+    "paths": {
+      "@vue/*": ["packages/*/src"]
+    }
+  }
+}
