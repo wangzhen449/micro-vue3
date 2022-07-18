@@ -7,6 +7,17 @@
   <title>Document</title>
 </head>
 <body>
+  <!-- <script src="https://unpkg.com/vue@next"></script> -->
   <script src="./reactivity.global.js"></script>
+  <script>
+    const { reactive, isReactive } = VueReactivity;
+    // const { reactive } = Vue
+    const jj = reactive({
+      a: { b: { c: [ { d: 1, e: { f: 0 } } ] } }
+    })
+
+    console.log(jj);
+    console.log(isReactive(jj));
+  </script>
 </body>
 </html>
