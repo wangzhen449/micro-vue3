@@ -20,15 +20,96 @@ var VueReactivity = (() => {
   // packages/reactivity/src/index.ts
   var src_exports = {};
   __export(src_exports, {
+    ReactiveEffect: () => ReactiveEffect,
     ReactiveFlags: () => ReactiveFlags,
+    activeEffect: () => activeEffect,
+    effect: () => effect,
     isReactive: () => isReactive,
-    reactive: () => reactive
+    reactive: () => reactive,
+    track: () => track,
+    trigger: () => trigger
   });
 
   // packages/shared/src/index.ts
   var isObject = (value) => {
     return typeof value === "object" && value !== null;
   };
+
+  // packages/reactivity/src/dep.ts
+  function createDep(effetcs) {
+    const dep = new Set(effetcs);
+    return dep;
+  }
+
+  // packages/reactivity/src/effect.ts
+  var targetMap = /* @__PURE__ */ new WeakMap();
+  var activeEffect;
+  var ReactiveEffect = class {
+    constructor(fn) {
+      this.fn = fn;
+      this.active = true;
+      this.deps = [];
+    }
+    run() {
+      if (!this.active) {
+        this.fn();
+      }
+      try {
+        activeEffect = this;
+        return this.fn();
+      } finally {
+        activeEffect = void 0;
+      }
+    }
+    stop() {
+    }
+  };
+  function effect(fn) {
+    debugger;
+    const _effect = new ReactiveEffect(fn);
+    _effect.run();
+    const runner = _effect.run.bind(_effect);
+    runner.effect = _effect;
+    return runner;
+  }
+  function track(target, key) {
+    if (activeEffect) {
+      let depsMap = targetMap.get(target);
+      if (!depsMap) {
+        targetMap.set(target, depsMap = /* @__PURE__ */ new Map());
+      }
+      let dep = depsMap.get(key);
+      if (!dep) {
+        depsMap.set(key, dep = createDep());
+      }
+      trackEffects(dep);
+    }
+  }
+  function trackEffects(dep) {
+    dep.add(activeEffect);
+    activeEffect.deps.push(dep);
+  }
+  function trigger(target, key, value) {
+    const depsMap = targetMap.get(target);
+    if (!depsMap)
+      return;
+    let deps = [];
+    if (key !== void 0) {
+      deps.push(depsMap.get(key));
+    }
+    if (deps.length === 1) {
+      triggerEffects(deps[0]);
+    }
+  }
+  function triggerEffects(dep) {
+    const effects = Array.isArray(dep) ? dep : [...dep];
+    for (const effect2 of effects) {
+      triggerEffect(effect2);
+    }
+  }
+  function triggerEffect(effect2) {
+    effect2.run();
+  }
 
   // packages/reactivity/src/baseHandlers.ts
   var get = createGetter();
@@ -43,6 +124,7 @@ var VueReactivity = (() => {
         return true;
       }
       const res = Reflect.get(target, key);
+      track(target, key);
       if (isObject(res)) {
         return reactive(res);
       }
@@ -52,6 +134,7 @@ var VueReactivity = (() => {
   function createSetter() {
     return function set2(target, key, value) {
       const result = Reflect.set(target, key, value);
+      trigger(target, key, value);
       return result;
     };
   }
@@ -67,6 +150,9 @@ var VueReactivity = (() => {
   }
   function createReactive(target, baseHandlers, proxyMap) {
     if (!isObject(target)) {
+      return target;
+    }
+    if (target["__v_isReactive" /* IS_REACTIVE */]) {
       return target;
     }
     const existingProxy = proxyMap.get(target);

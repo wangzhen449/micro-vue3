@@ -28,6 +28,11 @@ function createReactive(
     return target;
   }
 
+  // 如果已经是响应式对象，直接返回
+  if (target[ReactiveFlags.IS_REACTIVE]) {
+    return target
+  }
+
   // 已在Map中缓存的直接使用
   const existingProxy = proxyMap.get(target);
   if (existingProxy) {

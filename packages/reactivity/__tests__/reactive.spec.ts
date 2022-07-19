@@ -1,7 +1,7 @@
 import { reactive, isReactive } from "../src/reactive";
 
 describe("reactivity", () => {
-  it("aaa", () => {
+  it.skip("aaa", () => {
     const original = {
       b: {
         c: { e: { f: 1 } },

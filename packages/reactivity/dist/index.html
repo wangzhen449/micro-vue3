@@ -10,14 +10,18 @@
   <!-- <script src="https://unpkg.com/vue@next"></script> -->
   <script src="./reactivity.global.js"></script>
   <script>
-    const { reactive, isReactive } = VueReactivity;
+    const { reactive, isReactive, effect } = VueReactivity;
     // const { reactive } = Vue
-    const jj = reactive({
-      a: { b: { c: [ { d: 1, e: { f: 0 } } ] } }
+    const jj = reactive({count: 1})
+
+    let total = 0;
+    effect(() => {
+      total = jj.count + 1
     })
 
-    console.log(jj);
-    console.log(isReactive(jj));
+    console.log(total);
+    jj.count++
+    console.log(total);
   </script>
 </body>
 </html>
