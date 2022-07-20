@@ -59,13 +59,33 @@ var VueReactivity = (() => {
         return this.fn();
       } finally {
         activeEffect = void 0;
+        if (this.deferStop) {
+          this.stop();
+        }
       }
     }
     stop() {
+      if (activeEffect === this) {
+        this.deferStop = true;
+      } else if (this.active) {
+        cleanupEffect(this);
+        this.active = false;
+      }
     }
   };
+  function cleanupEffect(effect2) {
+    const { deps } = effect2;
+    if (deps.length) {
+      for (let i = 0; i < deps.length; i++) {
+        deps[i].delete(effect2);
+      }
+      deps.length = 0;
+    }
+  }
   function effect(fn) {
-    debugger;
+    if (fn.effect) {
+      fn = fn.effect.fn;
+    }
     const _effect = new ReactiveEffect(fn);
     _effect.run();
     const runner = _effect.run.bind(_effect);
@@ -86,8 +106,10 @@ var VueReactivity = (() => {
     }
   }
   function trackEffects(dep) {
-    dep.add(activeEffect);
-    activeEffect.deps.push(dep);
+    if (!dep.has(activeEffect)) {
+      dep.add(activeEffect);
+      activeEffect.deps.push(dep);
+    }
   }
   function trigger(target, key, value) {
     const depsMap = targetMap.get(target);
@@ -108,7 +130,9 @@ var VueReactivity = (() => {
     }
   }
   function triggerEffect(effect2) {
-    effect2.run();
+    if (effect2 !== activeEffect) {
+      effect2.run();
+    }
   }
 
   // packages/reactivity/src/baseHandlers.ts
