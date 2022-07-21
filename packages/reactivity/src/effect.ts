@@ -1,10 +1,12 @@
 import { createDep, Dep } from "./dep";
 
-/* v effect 监听函数中，多次触发相同getter，只收集一次
+/**
+ * v effect 监听函数中，多次触发相同getter，只收集一次
  * v effect 避免递归执行
  * v effect返回runner函数，支持手动触发监听函数
  * v effect传入一个runner，会重新包装，触发两次
  * v effect stop功能，支持在运行中延迟触发和运行后触发
+ * x 分支的处理
  * x shouldTrack
  * x trigger 中 key 为特殊属性的处理
  * x 嵌套effect 外层不会收集内层依赖，内层也不会收集外层依赖。
@@ -12,7 +14,7 @@ import { createDep, Dep } from "./dep";
  *
  * 如何保证多次修改只触发一次。（延迟更新）
  *
-*/
+ */
 
 // 存储方式为  WeakMap(target -> Map(key -> dep))
 // 使用Set而不是订阅的Dep类，是为了节省性能开销
@@ -115,7 +117,7 @@ export function track(target: object, key: unknown) {
     trackEffects(dep);
   }
 }
-function trackEffects(dep: Dep) {
+export function trackEffects(dep: Dep) {
   // Set中没有才执行插入动作
   if (!dep.has(activeEffect!)) {
     dep.add(activeEffect!); // ! 为TS非空断言
@@ -142,7 +144,7 @@ export function trigger(target: object, key?: unknown, value?: unknown) {
     triggerEffects(deps[0]);
   }
 }
-function triggerEffects(dep: Dep) {
+export function triggerEffects(dep: Dep) {
   // 统一为数组类型
   const effects = Array.isArray(dep) ? dep : [...dep];
   for (const effect of effects) {

@@ -25,15 +25,25 @@ var VueReactivity = (() => {
     activeEffect: () => activeEffect,
     effect: () => effect,
     isReactive: () => isReactive,
+    isRef: () => isRef,
     reactive: () => reactive,
+    reactiveMap: () => reactiveMap,
+    ref: () => ref,
+    toRaw: () => toRaw,
+    toReactive: () => toReactive,
     track: () => track,
-    trigger: () => trigger
+    trackEffects: () => trackEffects,
+    trigger: () => trigger,
+    triggerEffects: () => triggerEffects,
+    triggerRef: () => triggerRef,
+    unRef: () => unRef
   });
 
   // packages/shared/src/index.ts
   var isObject = (value) => {
     return typeof value === "object" && value !== null;
   };
+  var hasChanged = (value, oldValue) => !Object.is(value, oldValue);
 
   // packages/reactivity/src/dep.ts
   function createDep(effetcs) {
@@ -143,9 +153,11 @@ var VueReactivity = (() => {
     set
   };
   function createGetter() {
-    return function get2(target, key) {
+    return function get2(target, key, receiver) {
       if (key === "__v_isReactive" /* IS_REACTIVE */) {
         return true;
+      } else if (key === "__v_raw" /* RAW */ && receiver === reactiveMap.get(target)) {
+        return target;
       }
       const res = Reflect.get(target, key);
       track(target, key);
@@ -157,8 +169,11 @@ var VueReactivity = (() => {
   }
   function createSetter() {
     return function set2(target, key, value) {
+      const oldValue = target[key];
       const result = Reflect.set(target, key, value);
-      trigger(target, key, value);
+      if (hasChanged(value, oldValue)) {
+        trigger(target, key, value);
+      }
       return result;
     };
   }
@@ -166,6 +181,7 @@ var VueReactivity = (() => {
   // packages/reactivity/src/reactive.ts
   var ReactiveFlags = /* @__PURE__ */ ((ReactiveFlags2) => {
     ReactiveFlags2["IS_REACTIVE"] = "__v_isReactive";
+    ReactiveFlags2["RAW"] = "__v_raw";
     return ReactiveFlags2;
   })(ReactiveFlags || {});
   var reactiveMap = /* @__PURE__ */ new WeakMap();
@@ -189,6 +205,63 @@ var VueReactivity = (() => {
   }
   function isReactive(value) {
     return !!(value && value["__v_isReactive" /* IS_REACTIVE */]);
+  }
+  function toRaw(observed) {
+    return observed && observed["__v_raw" /* RAW */] || observed;
+  }
+  var toReactive = (value) => isObject(value) ? reactive(value) : value;
+
+  // packages/reactivity/src/ref.ts
+  function trackRefValue(ref2) {
+    if (activeEffect) {
+      ref2 = toRaw(ref2);
+      trackEffects(ref2.dep || (ref2.dep = createDep()));
+    }
+  }
+  function triggerRefValue(ref2) {
+    ref2 = toRaw(ref2);
+    if (ref2.dep) {
+      triggerEffects(ref2.dep);
+    }
+  }
+  function isRef(r) {
+    return !!(r && r.__v_isRef === true);
+  }
+  function ref(value) {
+    return createRef(value);
+  }
+  function createRef(rawValue) {
+    if (isRef(rawValue)) {
+      return rawValue;
+    } else {
+      return new RefImpl(rawValue);
+    }
+  }
+  var RefImpl = class {
+    constructor(value) {
+      this.dep = void 0;
+      this.__v_isRef = true;
+      this._rawValue = toRaw(value);
+      this._value = toReactive(value);
+    }
+    get value() {
+      trackRefValue(this);
+      return this._value;
+    }
+    set value(newVal) {
+      newVal = toRaw(newVal);
+      if (hasChanged(newVal, this._rawValue)) {
+        this._rawValue = newVal;
+        this._value = toReactive(newVal);
+        triggerRefValue(this);
+      }
+    }
+  };
+  function triggerRef(ref2) {
+    triggerRefValue(ref2);
+  }
+  function unRef(ref2) {
+    return isRef(ref2) ? ref2.value : ref2;
   }
   return __toCommonJS(src_exports);
 })();
