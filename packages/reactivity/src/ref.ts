@@ -12,7 +12,7 @@ type RefBase<T> = {
   value: T;
 };
 
-function trackRefValue(ref: RefBase<any>) {
+export function trackRefValue(ref: RefBase<any>) {
   // 如果当前有激活的effect
   if (activeEffect) {
     // 处理reactive包裹ref的情况
@@ -21,7 +21,7 @@ function trackRefValue(ref: RefBase<any>) {
     trackEffects(ref.dep || (ref.dep = createDep()));
   }
 }
-function triggerRefValue(ref: RefBase<any>) {
+export function triggerRefValue(ref: RefBase<any>) {
   // 处理reactive包裹ref的情况
   ref = toRaw(ref);
   if (ref.dep) {
