@@ -1,3 +1,10 @@
+const onRE = /^on[^a-z]/
+export const isOn = key => onRE.test(key)
+
+export const isArray = Array.isArray
+
+export const isString = (val: unknown): val is string => typeof val === 'string'
+
 export const isObject = (value: unknown): value is Record<any, any> =>
   typeof value === "object" && value !== null;
 

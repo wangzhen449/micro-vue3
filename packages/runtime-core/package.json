@@ -1,10 +1,10 @@
 {
-  "name": "@vue/shared",
+  "name": "@vue/runtime-core",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "buildOptions": {
-    "name": "VueShared",
+    "name": "VueRuntimeCore",
     "formats": [
       "cjs",
       "esm-bundler"
