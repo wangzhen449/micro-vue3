@@ -43,6 +43,7 @@ var VueReactivity = (() => {
   });
 
   // packages/shared/src/index.ts
+  var isArray = Array.isArray;
   var isObject = (value) => typeof value === "object" && value !== null;
   var isFunction = (value) => typeof value === "function";
   var hasChanged = (value, oldValue) => !Object.is(value, oldValue);

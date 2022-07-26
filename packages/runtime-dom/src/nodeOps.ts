@@ -30,5 +30,11 @@ export const nodeOps = {
   // 设置节点中的文本内容
   setElementText: (el, text) => {
     el.textContent = text
-  }
+  },
+
+  // 父元素
+  parentNode: node => node.parentNode,
+
+  // 下一个兄弟元素
+  nextSibling: node => node.nextSibling
 }
