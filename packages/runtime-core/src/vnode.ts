@@ -29,6 +29,10 @@ export function isVNode(vnode: any): boolean {
   return !!(vnode && vnode.__v_isVNode)
 }
 
+export function isSameVNodeType(n1, n2) {
+  return n1.type === n2.type && n1.key === n2.key
+}
+
 /**
  * v 定义VNode数据结构
  * v 根据参数处理VNode的shapeFlag类型
