@@ -149,7 +149,8 @@ export const createRenderer = (options) => {
   const mountChildren = (children, container) => {
     for (let i = 0; i < children.length; i++) {
       // 规范化child
-      let child = normalizeVNode(children[i])
+      let child = (children[i] = normalizeVNode(children[i]))
+
       // 递归patch
       patch(null, child, container)
     }
@@ -265,7 +266,7 @@ export const createRenderer = (options) => {
  * 2.3.2.2.1.1 n1child是数组 首先 unmountChildren 解绑
  * 2.3.2.2.1.2 n1child不等于n2child hostSetElementText 直接替换文本
  * 2.3.2.2.2 n2child不是字符串
- * 2.3.2.2.2.1 n1child是数组 n2child也是数组 patchKeyedChildren ****
+ * 2.3.2.2.2.1 n1child是数组 n2child也是数组 patchKeyedChildren/patchUnkeyedChildren ****
  * 2.3.2.2.2.2 n1child是数组 n2child是null unmountChildren 解绑
  * 2.3.2.2.2.3 n1child是字符串 先hostSetElementText设置空；n2child是数组 mountChildren
  * 2.3.2.3 patchProps 遍历新的props 修改属性；遍历老的props 删除属性
