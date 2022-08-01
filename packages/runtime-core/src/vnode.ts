@@ -20,9 +20,11 @@ export interface VNode {
   type: VNodeTypes
   props: any
   key: number | string | null
+  anchor: Element | null
   children: VNodeNormalizedChildren
   component: Component
   shapeFlag: number
+  patchFlag: number
 }
 
 export function isVNode(vnode: any): boolean {
@@ -60,9 +62,11 @@ function createBaseVNode(
     type,
     props,
     key: props?.key,
+    anchor: null,
     children,
     component: null,
-    shapeFlag
+    shapeFlag,
+    patchFlag: 0
   }
 
   if (children) {
