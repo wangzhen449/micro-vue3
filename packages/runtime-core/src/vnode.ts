@@ -2,9 +2,11 @@ import { isObject, isArray, isString, ShapeFlags } from '@vue/shared'
 
 export type Component = {}
 
-export type VNodeTypes = string | VNode | Component | Text
+export type VNodeTypes = string | VNode | Component | Text | typeof Fragment
 
 export const Text = Symbol(undefined)
+
+export const Fragment = Symbol()
 
 type VNodeChildAtom = VNode | string | number | boolean | null | undefined
 
@@ -42,8 +44,8 @@ export function isSameVNodeType(n1, n2) {
  * x 规范化
  */
 export function createVNode(type, props = null, children = null) {
-  // type如果是字符串就是元素类型
-  let shapeFlag = isString(type) ? ShapeFlags.ELEMENT : 0
+  // type如果是Fragment是0 否则就是元素类型
+  let shapeFlag = type === Fragment ? 0 : ShapeFlags.ELEMENT
 
   // TODO class 和 style 规范化
 

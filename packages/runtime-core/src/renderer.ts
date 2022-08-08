@@ -1,5 +1,5 @@
 import { isString, ShapeFlags } from '@vue/shared'
-import { isSameVNodeType, normalizeVNode, Text, VNode } from './vnode'
+import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode'
 
 // TODO 插入及删除的anchor需要记住
 
@@ -40,11 +40,25 @@ export const createRenderer = (options) => {
       case Text:
         processText(n1, n2, container, anchor)
         break
+      case Fragment:
+        processFragment(n1, n2, container, anchor)
+        break
       default:
         // 元素类型
         if (shapeFlag & ShapeFlags.ELEMENT) {
           processElement(n1, n2, container, anchor)
         }
+    }
+  }
+
+  /**
+   * Fragment 流程
+   */
+  const processFragment = (n1: VNode | null, n2: VNode, container, anchor) => {
+    if (n1 === null) {
+      mountChildren(n2.children, container)
+    } else {
+      patchChildren(n1, n2, container, anchor)
     }
   }
 
