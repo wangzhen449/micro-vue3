@@ -339,7 +339,7 @@ export const createRenderer = (options) => {
         // old中有相同key的元素
         if (newIndex !== undefined) {
           // - s2就是为了从0开始；值为了和0区分，都加1处理。
-          newIndexToOldIndexMap[newIndex - s2] = i + 1;
+          newIndexToOldIndexMap[newIndex - s2] = i + 1
 
           patch(oldChild, c2[newIndex], container)
         } else {
@@ -350,17 +350,24 @@ export const createRenderer = (options) => {
 
       // 3.移动元素位置
       // 从后向前循环的原因在于，移动操作需要依赖后面元素的el，所以必须保证后面的元素已经移动或者已挂载后，才能操作前面的。
+      const increasingNewIndexSequence = getSequence(newIndexToOldIndexMap)
+      let j = increasingNewIndexSequence.length - 1
       for (i = toBePatched - 1; i >= 0; i--) {
         const index = i + s2 // newChild真实序号
         let current = c2[index]
         let anchor = index + 1 < l2 ? c2[index + 1].el : null // 参照物是下一个或者null
-        if(newIndexToOldIndexMap[i] === 0) {
+        if (newIndexToOldIndexMap[i] === 0) {
           // 未在oldChild中出现过，需要挂载
           patch(null, current, container, anchor)
         } else {
-          // TODO 算法需要优化，最大上升子序
-          // 移动位置
-          move(current, container, anchor)
+          // 最大上升子序 从后向前查找，找到就略过
+          if (j < 0 || i !== increasingNewIndexSequence[j]) {
+            // 移动位置
+            move(current, container, anchor)
+          } else {
+            console.log(110, i)
+            j--
+          }
         }
       }
     }
@@ -398,6 +405,137 @@ export const createRenderer = (options) => {
     render,
     createApp
   }
+}
+
+
+/**
+ * 1. 动态规划法
+ * 每一个数字都记录到自身为止有多少个递增
+ * arr    [4, 6, 3, 5, 2, 7, 9, 8, 1]
+ * dp     [1, 2, 1, 2, 1, 3, 4, 4, 1]  记录每个数字截止自身，有多少个递增
+ * result [0, 1,          6, 7      ]  记录最长递增序列的序号
+ */
+function getSequence1(arr: number[]): number[] {
+  // 创建与参数同长度的数组，每一项初始化为1
+  const len = arr.length
+  const dp = Array(len).fill(1)
+  // 保存序号
+  let result = []
+  for (let i = 0; i < len; i++) {
+    const arrI = arr[i]
+    // 过滤掉值为0的情况
+    if (arrI === 0) {
+      continue
+    }
+
+    // 记录递增序号
+    let jResult = []
+    // 遍历i之前的每一项 对比大小
+    for (let j = 0; j < i; j++) {
+      const arrJ = arr[j]
+      // 过滤掉值为0的情况
+      if (arrJ === 0) {
+        continue
+      }
+
+      if (arrI > arrJ) {
+        // 只使用最长子序
+        if (dp[j] === dp[i]) {
+          dp[i] = dp[j] + 1
+          jResult.push(j)
+        }
+      }
+    }
+    // 最后添加上当前的序号。截止到当前肯定要添加当前，而上述操作没有添加当前。
+    jResult.push(i)
+
+    // 比之前结果长，改值
+    jResult.length > result.length && (result = jResult)
+  }
+  return result
+}
+
+/**
+ * 2. 贪心算法 + 二分查找（算法找到最长递增子序列的个数）；再通过回溯法，找到正确的序号
+ * 贪心+二分
+ * 从贪心角度考虑，尽可能增加递增子序列的长度
+ * 所以希望在上升子序列末尾加上的树尽可能的小
+ * 10, 9, 2, 5, 3, 7, 101, 4, 1
+ * 10
+ * 9
+ * 2
+ * 2 5
+ * 2 3
+ * 2 3 7
+ * 2 3 7 101
+ * 2 3 4 101
+ * 1 3 4 101
+ * 设当前已求出的最长上升子序列的长度为 len（初始时为 1），从前往后遍历数组 nums，在遍历到 nums[i] 时：
+ * 如果 nums[i] > d[len] ，则直接加入到 d 数组末尾，并更新 len=len+1；
+ * 否则，在 d 数组中二分查找，找到第一个比 nums[i] 小的数 d[k] ，并更新 d[k + 1] = nums[i]
+ *
+ * 回溯法
+ * 操作result时，记住他的前置节点。用最后一个节点，去追溯他的前置节点，即为正确序号。
+ */
+function getSequence(arr: number[]): number[] {
+  // 前置节点记录
+  const p = arr.slice()
+
+  const result = [0]
+  const len = arr.length
+  let i, j, start, end, middle
+  for (i = 0; i < len; i++) {
+    const arrI = arr[i]
+    if (arrI !== 0) {
+      j = result[result.length - 1]
+      // 当前值比result中最后一个数还大，直接放入result中，跳出本次循环
+      if (arr[j] < arrI) {
+        p[i] = j
+        result.push(i)
+        continue
+      }
+
+      // 二分查找 在结果集中找到比当前值大的，用当前索引替换
+      start = 0
+      end = result.length - 1
+
+      // 当 start 和 end相等的时候停止循环
+      while (start < end) {
+        // 都是除2向下取整的方式
+        middle = (start + end) >> 1
+        // middle = ((start + end) / 2) | 0
+        // middle = Math.floor((start + end) / 2)
+
+        // 继续二分
+        if (arr[result[middle]] < arrI) {
+          start = middle + 1
+        } else {
+          end = middle
+        }
+      }
+
+      // 替换 这里start 和 end 值是一样的
+      if (arrI < arr[result[start]]) {
+        // 第一个不需要记录
+        if (start > 0) {
+          // 替换之后，记录替换位置前面的那个。两种都可以
+          p[i] = result[start - 1]
+          // p[i] = p[end]
+        }
+        result[start] = i
+      }
+    }
+  }
+
+  let u = result.length
+  end = result[u - 1]
+  // 追溯在p中保存的前置序号
+  while (u-- > 0) {
+    result[u] = end
+    end = p[end]
+  }
+
+  return result
 }
 
 /**
@@ -457,5 +595,20 @@ export const createRenderer = (options) => {
  * 4.1 i > e2 && i <= e1
  * 4.2 i 右移，循环卸载节点
  * 5. 乱序节点
- *
+ * 5.1 生成keyToNewIndex映射表
+ * 5.2 循环oldChild，如果其key在映射表中可以找到就patch，找不到就卸载
+ * 5.3 移动元素，newChild新增的走挂载，其他移动位置
+ */
+
+/**
+ * 关于最长递增子序
+ * 上述在5.3移动元素中不管位置是否变化都会被移动。而最长递增子序无需移动。
+ * 为什么最长递增子序列无需要移动？
+ *    1. 入参是newIndexToOldIndexMap，也就是说以oldChild的下标为上升参照。
+ *    2. newChild中相对老的序号被打乱，处于序号上升的元素其实是不需要更换位置的。
+ *        [1,2,3,4] -> [1,4,2,3] 1,2,3无需移动，只需移动4
+ *    3. 找到最长递增子序，就能找到最多无需移动移动元素。
+ * 最长递增子序 getSequence
+ * 1. 动态规划法
+ * 2. 贪心+二分查找法（目前的最优解）
  */
