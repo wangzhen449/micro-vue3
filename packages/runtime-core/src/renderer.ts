@@ -1,8 +1,6 @@
 import { isString, ShapeFlags } from '@vue/shared'
 import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode'
 
-// TODO 插入及删除的anchor需要记住
-
 // 参数 RendererOptions<HostNode, HostElement>
 export const createRenderer = (options) => {
   const {
@@ -55,7 +53,7 @@ export const createRenderer = (options) => {
    * Fragment 流程
    */
   const processFragment = (n1: VNode | null, n2: VNode, container, anchor) => {
-    if (n1 === null) {
+    if (n1 == null) {
       mountChildren(n2.children, container)
     } else {
       patchChildren(n1, n2, container, anchor)
