@@ -1,5 +1,9 @@
+import { ReactiveEffect } from '@vue/reactivity'
 import { isString, ShapeFlags } from '@vue/shared'
+import { createComponentInstance, setupComponent } from './component'
+import { renderComponentRoot } from './componentRenderUtils'
 import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode'
+import { queueJob } from './scheduler'
 
 // 参数 RendererOptions<HostNode, HostElement>
 export const createRenderer = (options) => {
@@ -45,12 +49,81 @@ export const createRenderer = (options) => {
         // 元素类型
         if (shapeFlag & ShapeFlags.ELEMENT) {
           processElement(n1, n2, container, anchor)
+        } else if (shapeFlag & ShapeFlags.COMPONENT) {
+          processComponent(n1, n2, container, anchor)
         }
     }
   }
 
   /**
+   * 组件流程
+   * vue3 不建议使用函数式组件
+   */
+  const processComponent = (n1: VNode | null, n2: VNode, container, anchor) => {
+    if (n1 == null) {
+      mountComponent(n2, container, anchor)
+    } else {
+      // 组件更新靠props
+    }
+  }
+
+  /**
+   * 挂载组件
+   * 1. 创建组件实例
+   * 2. 对数据进行响应式处理， TODO 处理 setup
+   * 3. 为组件设置 effect，effect为渲染函数。 分为首次渲染和二次更新，二次更新依赖props的变化。
+   */
+  const mountComponent = (initialVNode, container, anchor) => {
+    // 创建组件实例
+    const instance = (initialVNode.component =
+      createComponentInstance(initialVNode))
+
+    // proxy 及 setup
+    setupComponent(instance)
+
+    // 组件effect处理
+    setupRenderEffect(instance, initialVNode, container, anchor)
+  }
+
+  /**
+   * effect
+   */
+  const setupRenderEffect = (instance, initialVNode, container, anchor) => {
+    // 首次渲染和更新都要走这个函数，通过isMounted判断
+    const componentUpdateFn = () => {
+      // 首次渲染
+      if (!instance.isMounted) {
+        // 组件的vnode 将组件实例转化为vnode
+        const subTree = (instance.subTree = renderComponentRoot(instance))
+        // 将subTree渲染为真是节点
+        patch(null, subTree, container, anchor)
+        instance.isMounted = true
+      } else {
+        // 更新操作
+
+        const nextTree = renderComponentRoot(instance)
+        const prevTree = instance.subTree
+        instance.subTree = nextTree
+        // 前后vnode进行patch比较
+        patch(prevTree, nextTree, container, anchor)
+      }
+    }
+
+    // 这里没有使用effect是因为，源码中使用scope参数，来收集所有的effect。但目前没有用到
+    // 需要使用调度器，控制组件刷新的频率
+    const effect = (instance.effect = new ReactiveEffect(
+      componentUpdateFn,
+      () => queueJob(update)
+    ))
+
+    const update = (instance.update = effect.run.bind(effect))
+
+    update()
+  }
+
+  /**
    * Fragment 流程
+   * 碎片化节点中只有children；所以只存在新增和对比children的两个过程
    */
   const processFragment = (n1: VNode | null, n2: VNode, container, anchor) => {
     if (n1 == null) {
@@ -418,7 +491,6 @@ export const createRenderer = (options) => {
     createApp
   }
 }
-
 
 /**
  * 1. 动态规划法

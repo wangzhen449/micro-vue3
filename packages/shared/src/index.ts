@@ -19,3 +19,6 @@ export const hasChanged = (value: any, oldValue: any): boolean =>
 export const NOOP = () => {}
 
 export const extend = Object.assign
+
+const hasOwnProperty = Object.prototype.hasOwnProperty
+export const hasOwn = (obj, key) => hasOwnProperty.call(obj, key)

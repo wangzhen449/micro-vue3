@@ -1,4 +1,5 @@
 import { isObject, isArray, isString, ShapeFlags } from '@vue/shared'
+import { isFunction } from '../../shared/src/index';
 
 export type Component = {}
 
@@ -44,8 +45,12 @@ export function isSameVNodeType(n1, n2) {
  * x 规范化
  */
 export function createVNode(type, props = null, children = null) {
-  // type如果是Fragment是0 否则就是元素类型
-  let shapeFlag = type === Fragment ? 0 : ShapeFlags.ELEMENT
+
+  const shapeFlag =
+    isString(type) ? ShapeFlags.ELEMENT :
+    isObject(type) ? ShapeFlags.STATEFUL_COMPONENT :
+    isFunction(type) ? ShapeFlags.FUNCTIONAL_COMPONENT :
+    0
 
   // TODO class 和 style 规范化
 
