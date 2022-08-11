@@ -70,7 +70,7 @@ export const createRenderer = (options) => {
   /**
    * 挂载组件
    * 1. 创建组件实例
-   * 2. 对数据进行响应式处理， TODO 处理 setup
+   * 2. 对组件实例赋值  包括 对数据进行响应式处理， TODO 处理 setup
    * 3. 为组件设置 effect，effect为渲染函数。 分为首次渲染和二次更新，二次更新依赖props的变化。
    */
   const mountComponent = (initialVNode, container, anchor) => {
@@ -78,6 +78,7 @@ export const createRenderer = (options) => {
     const instance = (initialVNode.component =
       createComponentInstance(initialVNode))
 
+    // 给instance赋值 proxy、render、props、attrs....
     // proxy 及 setup
     setupComponent(instance)
 
@@ -87,6 +88,12 @@ export const createRenderer = (options) => {
 
   /**
    * effect
+   * 1. 创建effect 传入 fn 和 调度器
+   * 1.1. fn 分为首次渲染和二次更新，都是走的patch逻辑，二次更新时n1使用实例之前存储的subTree
+   * 1.1.1. subTree 是组件转化的vnode，通过调用组件实例的render方法获得（render方法使用组件实例的proxy作为执行上下文）
+   * 1.2. 为了保证多次修改只执行一次，传入调度器
+   * 1.2.1. 调度器收集所有的要执行的任务，通过微任务异步更新
+   * 2. effect 赋值给 instance.update，方便后续更新使用
    */
   const setupRenderEffect = (instance, initialVNode, container, anchor) => {
     // 首次渲染和更新都要走这个函数，通过isMounted判断

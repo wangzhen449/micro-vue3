@@ -1,7 +1,9 @@
 import { isObject, isArray, isString, ShapeFlags } from '@vue/shared'
 import { isFunction } from '../../shared/src/index';
 
-export type Component = {}
+export type Component = {
+  props: any
+}
 
 export type VNodeTypes = string | VNode | Component | Text | typeof Fragment
 

@@ -1,7 +1,8 @@
 import { NOOP, ShapeFlags } from '@vue/shared';
-import { VNode } from './vnode';
+import { Component, VNode } from './vnode';
 import { PublicInstanceProxyHandlers } from './componentPublicInstance'
 import { applyOptions } from './componentOptions';
+import { initProps } from './componentProps';
 
 let uid = 0
 
@@ -15,7 +16,13 @@ export function createComponentInstance(vnode: VNode) {
     accessCache: null, //代理访问缓存
     isMounted: false, // 是否挂载
     effect: null,
-    ctx: {}
+    ctx: {},
+    render: null,
+    proxy: null,
+
+    propsOptions: [(type as Component).props],
+    props: {},
+    attrs: {}
   }
 
   instance.ctx = {
@@ -31,8 +38,13 @@ export function isStatefulComponent(instance) {
 }
 
 export function setupComponent(instance) {
+  const { props } = instance.vnode
   // 是否是 stateful 组件
   const isStateful = isStatefulComponent(instance)
+
+  // 处理props 和 attr
+  initProps(instance, props, isStateful)
+
   // stateful 组件 调用setupStatefulComponent
   const setupResult = isStateful ? setupStatefulComponent(instance) : undefined
   return setupResult
