@@ -2,7 +2,10 @@ import { isObject, isArray, isString, ShapeFlags } from '@vue/shared'
 import { isFunction } from '../../shared/src/index';
 
 export type Component = {
-  props: any
+  props: any,
+  vnode: VNode,
+  update: any,
+  next: VNode
 }
 
 export type VNodeTypes = string | VNode | Component | Text | typeof Fragment

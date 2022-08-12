@@ -12,6 +12,7 @@ export function createComponentInstance(vnode: VNode) {
     uid: uid++,
     type,
     vnode,
+    next: null, // 记录n2
     subTree: null, // 渲染组件的内容
     accessCache: null, //代理访问缓存
     isMounted: false, // 是否挂载

@@ -1,9 +1,13 @@
 import { ReactiveEffect } from '@vue/reactivity'
 import { isString, ShapeFlags } from '@vue/shared'
 import { createComponentInstance, setupComponent } from './component'
-import { renderComponentRoot } from './componentRenderUtils'
-import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode'
+import {
+  renderComponentRoot,
+  shouldUpdateComponent
+} from './componentRenderUtils'
+import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode';
 import { queueJob } from './scheduler'
+import { updateProps } from './componentProps';
 
 // 参数 RendererOptions<HostNode, HostElement>
 export const createRenderer = (options) => {
@@ -61,9 +65,12 @@ export const createRenderer = (options) => {
    */
   const processComponent = (n1: VNode | null, n2: VNode, container, anchor) => {
     if (n1 == null) {
+      // 挂载组件
       mountComponent(n2, container, anchor)
     } else {
-      // 组件更新靠props
+      // 当父组件重新渲染时，会触发子组件的patch
+      // 当子组件依赖的props被父组件改变的时候，就会触发组件重新渲染
+      updateComponent(n1, n2)
     }
   }
 
@@ -107,6 +114,16 @@ export const createRenderer = (options) => {
         instance.isMounted = true
       } else {
         // 更新操作
+        let { next, props, vnode } = instance
+
+        // 通过next在这里更改props，由于在同一个effect内部，不会触发二次更新
+        if (next) {
+          next.el = vnode.el
+
+          updateComponentPreRender(instance, next)
+        } else {
+          next = vnode
+        }
 
         const nextTree = renderComponentRoot(instance)
         const prevTree = instance.subTree
@@ -126,6 +143,32 @@ export const createRenderer = (options) => {
     const update = (instance.update = effect.run.bind(effect))
 
     update()
+  }
+
+  const updateComponentPreRender = (instance, nextVnode) => {
+    const prevProps = instance.vnode.props
+    // 更换新的vnode
+    instance.vnode = nextVnode
+    // next置为空
+    instance.next = null
+    // 更新props
+    updateProps(instance, nextVnode.props, prevProps)
+  }
+
+  // 组件外部变化引起的更新
+  const updateComponent = (n1, n2) => {
+    const instance = (n2.component = n1.component)
+    // 判断组件是否更新
+    if (shouldUpdateComponent(n1, n2)) {
+      // 这里需要更改组件实例的vnode和props，但是更改props时，又会触发组件的更新
+      // 把n2存储在组件实例的next上，在组件更新函数中修改props的值，这样就不会造成二次更新
+      instance.next = n2
+      instance.update()
+    } else {
+      // 无需更新
+      n2.el = n1.el
+      instance.vnode = n2
+    }
   }
 
   /**
