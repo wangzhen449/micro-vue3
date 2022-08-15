@@ -1,8 +1,9 @@
-import { NOOP, ShapeFlags } from '@vue/shared';
-import { Component, VNode } from './vnode';
+import { isFunction, isObject, NOOP, ShapeFlags } from '@vue/shared';
+import { Component, VNode, isVNode } from './vnode';
 import { PublicInstanceProxyHandlers } from './componentPublicInstance'
 import { applyOptions } from './componentOptions';
 import { initProps } from './componentProps';
+import { proxyRefs } from '@vue/reactivity';
 
 let uid = 0
 
@@ -23,7 +24,10 @@ export function createComponentInstance(vnode: VNode) {
 
     propsOptions: [(type as Component).props],
     props: {},
-    attrs: {}
+    attrs: {},
+
+    setupState: {},
+    setupContext: null,
   }
 
   instance.ctx = {
@@ -59,12 +63,40 @@ function setupStatefulComponent(instance) {
   // 代理 实际代理的是 {_: instance}
   instance.proxy = new Proxy(instance.ctx, PublicInstanceProxyHandlers)
 
+  /**
+   * 处理 setup
+   * 1. setup接收组件传入的props，和执行上下文
+   * 2. setup有两种返回方式，一种返回state对象，一种返回render函数
+   * 2.1 如果返回state对象，在组件的render函数中，this指向 setup返回的state对象被proxyRefs处理之后的结果。这样render中就不需使用.value
+   * 2.2 如果返回的是render函数，将函数赋值给组件的render
+   * 3. 问题？？props或外部引起的更新，更新的时候，没有更新setupState，是否会造成潜在的问题
+   */
   const { setup } = Component
   if (setup) {
+    // setup的执行上下文
+    const setupContext = null
+    // 给setup传入props
+    const setupResult = setup(instance.props, setupContext)
 
+    // 处理setup的返回值是 对象 或 函数 的问题
+    handleSetupResult(instance, setupResult)
   } else {
+    // 设置render 及其他
     finishComponentSetup(instance)
   }
+}
+
+function handleSetupResult (instance, setupResult) {
+  // 函数 返回的就是render函数
+  if (isFunction(setupResult)) {
+    instance.render = setupResult
+  } else if (isObject(setupResult)) {
+    // 对象 进行proxyRefs处理，render/模板中无需.value
+    instance.setupState = proxyRefs(setupResult)
+  }
+
+  // 会判断有无render的情况
+  finishComponentSetup(instance)
 }
 
 function finishComponentSetup(instance) {

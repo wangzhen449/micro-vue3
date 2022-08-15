@@ -2,7 +2,8 @@ import { hasOwn } from '@vue/shared'
 
 const enum AccessTypes {
   DATA,
-  PROPS
+  PROPS,
+  SETUP
 }
 
 export const publicPropertiesMap = {
@@ -16,7 +17,7 @@ export const publicPropertiesMap = {
  */
 export const PublicInstanceProxyHandlers = {
   get({ _: instance }, key) {
-    const { data, props, attrs, ctx, accessCache } = instance
+    const { data, props, setupState, attrs, ctx, accessCache } = instance
 
     // 不是$开头的
     if (key[0] !== '$') {
@@ -24,14 +25,19 @@ export const PublicInstanceProxyHandlers = {
       const n = accessCache![key]
       if (n !== undefined) {
         switch (n) {
+          case AccessTypes.SETUP:
+            return setupState[key]
           case AccessTypes.DATA:
             return data[key]
           case AccessTypes.PROPS:
             return props[key]
         }
       }
-      // 这里的查找是有先后顺序的，也就是同时出现的情况，优先级从上到下
-      else if (data && hasOwn(data, key)) { // 在data中找到
+      // 这里的查找是有先后顺序的，也就是同时出现的情况，优先级从上到下(setupState -> data -> props)
+      else if (setupState && hasOwn(setupState, key)) { // 在setupState中找到
+        accessCache[key] = AccessTypes.SETUP
+        return setupState[key]
+      } else if (data && hasOwn(data, key)) { // 在data中找到
         accessCache[key] = AccessTypes.DATA
         // 数据已经是响应式了
         return data[key]
@@ -48,9 +54,12 @@ export const PublicInstanceProxyHandlers = {
     }
   },
   set({ _: instance }, key, value) {
-    const { data, props } = instance
+    const { setupState, data, props } = instance
     // 数据已经被proxy代理，set操作会走proxy中的代理
-    if (data && hasOwn(data, key)) {
+    if (setupState && hasOwn(setupState, key)) {
+      setupState[key] = value
+      return true
+    } else if (data && hasOwn(data, key)) {
       data[key] = value
       return true
     } else if (props && hasOwn(props, key)) {
