@@ -81,6 +81,8 @@ function createBaseVNode(
     patchFlag: 0
   }
 
+  // TODO children需要规范化
+
   if (children) {
     // 如果传了子元素，只能是字符串或者数组
     vnode.shapeFlag |= isString(children)

@@ -22,3 +22,10 @@ export const extend = Object.assign
 
 const hasOwnProperty = Object.prototype.hasOwnProperty
 export const hasOwn = (obj, key) => hasOwnProperty.call(obj, key)
+
+export const capitalize = (str: string): string =>
+  str.charAt(0).toUpperCase() + str.slice(1)
+
+// on + 首字母大写
+export const toHandlerKey = (str: string): string =>
+  str ? `on${capitalize(str)}` : ''
