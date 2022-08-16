@@ -59,14 +59,15 @@ export function createVNode(type, props = null, children = null) {
 
   // TODO class 和 style 规范化
 
-  return createBaseVNode(type, props, children, shapeFlag)
+  return createBaseVNode(type, props, children, shapeFlag, true)
 }
 
 function createBaseVNode(
   type: any,
   props: any = null,
   children: any = null,
-  shapeFlag: number | ShapeFlags
+  shapeFlag: number | ShapeFlags,
+  needFullChildrenNormalization = false
 ) {
   const vnode = {
     __v_isVNode: true, // 是否是vnode的标识
@@ -81,9 +82,10 @@ function createBaseVNode(
     patchFlag: 0
   }
 
-  // TODO children需要规范化
-
-  if (children) {
+  // children规范化
+  if (needFullChildrenNormalization) {
+    normalizeChildren(vnode, children)
+  } else if (children) {
     // 如果传了子元素，只能是字符串或者数组
     vnode.shapeFlag |= isString(children)
       ? ShapeFlags.TEXT_CHILDREN
@@ -100,6 +102,9 @@ export function normalizeVNode(child: VNodeChild) {
   if (child === null || typeof child === 'boolean') {
     // 这是注释
   } else if (isArray(child)) {
+    // 如果是数组，将数组放到Fragment容器中铺平
+    // slots就是数组
+    return createVNode(Fragment, null, child.slice())
   } else if (isObject(child)) {
     // vnode
     // TODO 判断是否mount过
@@ -108,4 +113,32 @@ export function normalizeVNode(child: VNodeChild) {
     // 字符串
     return createVNode(Text, null, String(child))
   }
+}
+
+// 标准化children
+// 更好的处理solts、非对象函数的 children
+export function normalizeChildren(vnode, children) {
+  let type = 0
+  // 避免 children 是null时，走到下面的逻辑中
+  if (children == null) {
+    children = null
+  } else if (isArray(children)) {
+    // 数组children
+    type = ShapeFlags.ARRAY_CHILDREN
+  } else if (typeof children === 'object') { // 不可以是null
+    // slots
+    type = ShapeFlags.SLOTS_CHILDREN
+    // TODO 为children 设置 _ctx 上下文
+  } else if (isFunction(children)) {
+    // slots
+    children = {default: children}
+    type = ShapeFlags.SLOTS_CHILDREN
+  } else {
+    // number string等 都按照字符串处理
+    children = String(children)
+    type = ShapeFlags.TEXT_CHILDREN
+  }
+
+  vnode.children = children
+  vnode.shapeFlag |= type
 }

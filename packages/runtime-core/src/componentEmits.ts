@@ -9,6 +9,6 @@ export function emit(instance, event, ...rawArgs) {
   // 问题？？? 在props中传入的事件处理函数，如何获取到组件实例，或者this
   let handler = props[toHandlerKey(event)]
   if (handler) {
-    handler(rawArgs)
+    handler(...rawArgs)
   }
 }

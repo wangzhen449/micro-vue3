@@ -7,7 +7,8 @@ const enum AccessTypes {
 }
 
 export const publicPropertiesMap = {
-  $attrs: i => i.attrs
+  $attrs: i => i.attrs,
+  $slots: i => i.slots
 }
 
 /**

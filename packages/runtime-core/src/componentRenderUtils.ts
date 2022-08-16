@@ -29,8 +29,17 @@ export function renderComponentRoot(instance) {
 
 // 是否需要更新组件
 export function shouldUpdateComponent( prevVNode: VNode, nextVNode: VNode ): boolean {
-  const { props: prevProps } = prevVNode
-  const { props: nextProps } = nextVNode
+  const { props: prevProps, children: prevChildren } = prevVNode
+  const { props: nextProps, children: nextChildren } = nextVNode
+
+  // 组件的children就是slots。这部分是针对手动渲染做处理的
+  // next slots没传 或者 后传入的slots没有 $table hint 就进行更新
+  // $stable hint 是专门为了标识 slots 不更新的
+  if (prevChildren || nextChildren) {
+    if(!nextChildren || !(nextChildren as any).$stable) {
+      return true
+    }
+  }
 
   // n1 n2 的 props 一致不更新
   if (prevProps === nextProps) {

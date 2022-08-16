@@ -5,6 +5,7 @@ import { applyOptions } from './componentOptions'
 import { initProps } from './componentProps'
 import { proxyRefs } from '@vue/reactivity'
 import { emit } from './componentEmits'
+import { initSlots } from './componentSlots'
 
 let uid = 0
 
@@ -32,8 +33,7 @@ export function createComponentInstance(vnode: VNode) {
 
     expose: null,
     slots: null,
-    emit: null,
-
+    emit: null
   }
 
   instance.ctx = {
@@ -52,12 +52,13 @@ export function isStatefulComponent(instance) {
 }
 
 export function setupComponent(instance) {
-  const { props } = instance.vnode
+  const { props, children } = instance.vnode
   // 是否是 stateful 组件
   const isStateful = isStatefulComponent(instance)
 
   // 处理props 和 attr
   initProps(instance, props, isStateful)
+  initSlots(instance, children)
 
   // stateful 组件 调用setupStatefulComponent
   const setupResult = isStateful ? setupStatefulComponent(instance) : undefined
@@ -128,13 +129,13 @@ function finishComponentSetup(instance) {
 
 // 创建setup执行上下文
 export function createSetupContext(instance) {
-  const expose = expose => {
+  const expose = (expose) => {
     instance.expose = expose || {}
   }
   return {
     attrs: instance.attrs,
     slots: instance.slots,
     emit: instance.emit,
-    expose,
+    expose
   }
 }

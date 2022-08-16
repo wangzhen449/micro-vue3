@@ -8,6 +8,7 @@ import {
 import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode';
 import { queueJob } from './scheduler'
 import { updateProps } from './componentProps';
+import { updateSlots } from './componentSlots';
 
 // 参数 RendererOptions<HostNode, HostElement>
 export const createRenderer = (options) => {
@@ -79,6 +80,7 @@ export const createRenderer = (options) => {
    * 1. 创建组件实例
    * 2. 对组件实例赋值  包括 对数据进行响应式处理， TODO 处理 setup
    * 3. 为组件设置 effect，effect为渲染函数。 分为首次渲染和二次更新，二次更新依赖props的变化。
+   * 4. initialVNode 是 组件vnode；而 subTree 是 组件render渲染返回的 子树vnode
    */
   const mountComponent = (initialVNode, container, anchor) => {
     // 创建组件实例
@@ -153,6 +155,8 @@ export const createRenderer = (options) => {
     instance.next = null
     // 更新props
     updateProps(instance, nextVnode.props, prevProps)
+    // 更新slots
+    updateSlots(instance, nextVnode.children)
   }
 
   // 组件外部变化引起的更新
