@@ -7,7 +7,26 @@ import { proxyRefs } from '@vue/reactivity'
 import { emit } from './componentEmits'
 import { initSlots } from './componentSlots'
 
+export const enum LifecycleHooks {
+  BEFORE_CREATE = 'bc',
+  CREATED = 'c',
+  BEFORE_MOUNT = 'bm',
+  MOUNTED = 'm',
+  BEFORE_UPDATE = 'bu',
+  UPDATED = 'u',
+  BEFORE_UNMOUNT = 'bum',
+  UNMOUNTED = 'um',
+  DEACTIVATED = 'da',
+  ACTIVATED = 'a',
+  RENDER_TRIGGERED = 'rtg',
+  RENDER_TRACKED = 'rtc',
+  ERROR_CAPTURED = 'ec',
+  SERVER_PREFETCH = 'sp'
+}
+
 let uid = 0
+
+export let currentInstance = null
 
 export function createComponentInstance(vnode: VNode) {
   const { type } = vnode
@@ -18,7 +37,6 @@ export function createComponentInstance(vnode: VNode) {
     next: null, // 记录n2
     subTree: null, // 渲染组件的内容
     accessCache: null, //代理访问缓存
-    isMounted: false, // 是否挂载
     effect: null,
     ctx: {},
     render: null,
@@ -33,7 +51,16 @@ export function createComponentInstance(vnode: VNode) {
 
     expose: null,
     slots: null,
-    emit: null
+    emit: null,
+
+    isMounted: false, // 是否挂载
+    isUnmounted: false, // 是否已卸载
+    bm: null,
+    m: null,
+    bu: null,
+    u: null,
+    bum: null,
+    um: null,
   }
 
   instance.ctx = {
@@ -45,6 +72,20 @@ export function createComponentInstance(vnode: VNode) {
 
   return instance
 }
+
+// TODO scope
+// TODO pauseTracking resetTracking
+// 获取当前激活的组件实例
+export const getCurrentInstance = () => currentInstance
+// 设置当前激活的组件实例
+export const setCurrentInstance = (instance) => {
+  currentInstance = instance
+}
+// 删除当前激活的组件实例
+export const unsetCurrentInstance = () => {
+  currentInstance = null
+}
+
 
 // 基于对象 options 方式创建的，属于 stateful 组件。还有一种是函数类型的
 export function isStatefulComponent(instance) {
@@ -82,14 +123,22 @@ function setupStatefulComponent(instance) {
    * 3. 问题？？props或外部引起的更新，更新的时候，没有更新setupState，是否会造成潜在的问题
    *
    * 4. 执行上下文包括（attrs、slots、emit、expose）
+   * 5. 设置当前激活的组件实例，当组件有setup属性的时候才会设置。没有setup也无需设置
    */
   const { setup } = Component
   if (setup) {
     // setup的执行上下文 如果参数超过1个才设置
     const setupContext = (instance.setupContext =
       setup.length > 1 ? createSetupContext(instance) : null)
+
+    // 设置当前激活的组件实例
+    setCurrentInstance(instance)
+
     // 给setup传入props
     const setupResult = setup(instance.props, setupContext)
+
+    // setup已经执行完，重置currentInstance
+    unsetCurrentInstance()
 
     // 处理setup的返回值是 对象 或 函数 的问题
     handleSetupResult(instance, setupResult)

@@ -1,5 +1,5 @@
 import { ReactiveEffect } from '@vue/reactivity'
-import { isString, ShapeFlags } from '@vue/shared'
+import { invokeArrayFns, isString, ShapeFlags } from '@vue/shared'
 import { createComponentInstance, setupComponent } from './component'
 import {
   renderComponentRoot,
@@ -109,22 +109,40 @@ export const createRenderer = (options) => {
     const componentUpdateFn = () => {
       // 首次渲染
       if (!instance.isMounted) {
+        const { bm, m } = instance
+
+        // 执行beforeMount
+        if (bm) {
+          invokeArrayFns(bm)
+        }
         // 组件的vnode 将组件实例转化为vnode
         const subTree = (instance.subTree = renderComponentRoot(instance))
         // 将subTree渲染为真是节点
         patch(null, subTree, container, anchor)
+
+        // 执行mounted
+        if (m) {
+          invokeArrayFns(m)
+        }
         instance.isMounted = true
       } else {
         // 更新操作
-        let { next, props, vnode } = instance
+        let { next, props, vnode, bu, u } = instance
+
 
         // 通过next在这里更改props，由于在同一个effect内部，不会触发二次更新
         if (next) {
           next.el = vnode.el
 
+          // 更新组件实例
           updateComponentPreRender(instance, next)
         } else {
           next = vnode
+        }
+
+        // 执行beforeUpdate
+        if (bu) {
+          invokeArrayFns(bu)
         }
 
         const nextTree = renderComponentRoot(instance)
@@ -132,6 +150,12 @@ export const createRenderer = (options) => {
         instance.subTree = nextTree
         // 前后vnode进行patch比较
         patch(prevTree, nextTree, container, anchor)
+        next.el = nextTree.el
+
+        // 执行Updated
+        if (u) {
+          invokeArrayFns(u)
+        }
       }
     }
 
@@ -340,6 +364,7 @@ export const createRenderer = (options) => {
     }
   }
 
+  // TODO 组件缺少卸载过程
   const unmount = (vnode) => {
     remove(vnode)
   }

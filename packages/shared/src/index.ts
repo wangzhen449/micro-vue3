@@ -16,6 +16,12 @@ export const isFunction = (value: unknown): value is Function =>
 export const hasChanged = (value: any, oldValue: any): boolean =>
   !Object.is(value, oldValue)
 
+export const invokeArrayFns = (fns, arg?) => {
+  for (let i = 0; i < fns.length; i++) {
+    fns[i](arg)
+  }
+}
+
 export const NOOP = () => {}
 
 export const extend = Object.assign
