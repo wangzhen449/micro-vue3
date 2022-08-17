@@ -5,10 +5,10 @@ import {
   renderComponentRoot,
   shouldUpdateComponent
 } from './componentRenderUtils'
-import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode';
+import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode'
 import { queueJob } from './scheduler'
-import { updateProps } from './componentProps';
-import { updateSlots } from './componentSlots';
+import { updateProps } from './componentProps'
+import { updateSlots } from './componentSlots'
 
 // 参数 RendererOptions<HostNode, HostElement>
 export const createRenderer = (options) => {
@@ -38,7 +38,7 @@ export const createRenderer = (options) => {
       // 记录卸载元素的位置，后面的就从这个位置插入
       anchor = getNextHostNode(n1)
       // remove掉
-      unmount(n1)
+      unmount(n1, true)
       n1 = null
     }
 
@@ -129,7 +129,6 @@ export const createRenderer = (options) => {
         // 更新操作
         let { next, props, vnode, bu, u } = instance
 
-
         // 通过next在这里更改props，由于在同一个effect内部，不会触发二次更新
         if (next) {
           next.el = vnode.el
@@ -200,12 +199,53 @@ export const createRenderer = (options) => {
   }
 
   /**
+   * 卸载组件
+   * 1. 触发unmounted的生命周期函数
+   * 2. 关闭effect，渲染更新不在生效
+   * 3. 卸载子树
+   */
+  const unmountComponent = (instance, doRemove?) => {
+    const { bum, um, update, subTree } = instance
+
+    // 执行 beforeUnmount
+    if (bum) {
+      invokeArrayFns(bum)
+    }
+
+    if (update) {
+      // 关闭effect
+      update.active = false
+
+      // 卸载 子树
+      unmount(subTree, doRemove)
+    }
+
+    // 执行 unmounted
+    if (um) {
+      invokeArrayFns(um)
+    }
+
+    instance.isUnmounted = true
+  }
+
+  /**
    * Fragment 流程
    * 碎片化节点中只有children；所以只存在新增和对比children的两个过程
+   * 要标记 Fragment 的起止位置，方便后续删除 (removeFragment)
    */
   const processFragment = (n1: VNode | null, n2: VNode, container, anchor) => {
+    // 起止位置就是从 n1 到 n1的下一个
+    // Fragment开始位置
+    const fragmentStartAnchor = (n2.el = n1 ? n1.el : hostCreateText(''))
+    // Fragment结束位置
+    const fragmentEndAnchor = (n2.anchor = n1 ? n1.anchor : hostCreateText(''))
+
     if (n1 == null) {
-      mountChildren(n2.children, container)
+      // n1 没有，需要插入Fragment的起止位置
+      hostInsert(fragmentStartAnchor, container, anchor)
+      hostInsert(fragmentEndAnchor, container, anchor)
+
+      mountChildren(n2.children, container, fragmentEndAnchor)
     } else {
       patchChildren(n1, n2, container, anchor)
     }
@@ -295,7 +335,7 @@ export const createRenderer = (options) => {
       hostSetElementText(el, vnode.children as string)
     } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
       // children 是 数组
-      mountChildren(vnode.children, el)
+      mountChildren(vnode.children, el, anchor)
     }
 
     // 处理属性props，通过patchProp处理props
@@ -312,13 +352,13 @@ export const createRenderer = (options) => {
   /**
    * 挂载children
    */
-  const mountChildren = (children, container) => {
+  const mountChildren = (children, container, anchor) => {
     for (let i = 0; i < children.length; i++) {
       // 规范化child
       let child = (children[i] = normalizeVNode(children[i]))
 
       // 递归patch
-      patch(null, child, container)
+      patch(null, child, container, anchor)
     }
   }
 
@@ -349,7 +389,7 @@ export const createRenderer = (options) => {
           patchKeyedChildren(c1, c2, container, anchor)
         } else {
           // n2 null
-          unmountChildren(c1)
+          unmountChildren(c1, true)
         }
       } else {
         // n1 string | null
@@ -358,24 +398,56 @@ export const createRenderer = (options) => {
           hostSetElementText(container, '')
         }
         if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-          mountChildren(c2, container)
+          mountChildren(c2, container, anchor)
         }
       }
     }
   }
 
-  // TODO 组件缺少卸载过程
-  const unmount = (vnode) => {
-    remove(vnode)
+  // doRemove 只是一个是否执行删除 dom 的标识，false的情况也是通过其他方式替换了。
+  const unmount = (vnode, doRemove = false) => {
+    const { type, children, shapeFlag } = vnode
+
+    // 组件的卸载
+    if (shapeFlag & ShapeFlags.COMPONENT) {
+      // 组件在内部处理逻辑中移除dom
+      unmountComponent(vnode.component, doRemove)
+    } else {
+      // Fragment 是一个容器。遍历子元素依次卸载。不给子元素的卸载不会执行dom删除，而是在remove中卸载Fragment
+      if (type === Fragment && shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+        unmountChildren(children)
+      }
+
+      if (doRemove) {
+        remove(vnode)
+      }
+    }
   }
 
   const remove = (vnode) => {
-    hostRemove(vnode.el)
+    const { type, el, anchor } = vnode
+    if (type === Fragment) {
+      removeFragment(el, anchor)
+      return
+    }
+
+    hostRemove(el)
   }
 
-  const unmountChildren = (children) => {
+  // Fragment是一个容器，只能找到开始和结束位置，依次删除
+  const removeFragment = (cur, end) => {
+    let next
+    while (cur !== end) {
+      next = hostNextSibling(cur)
+      hostRemove(cur)
+      cur = next
+    }
+    hostRemove(end)
+  }
+
+  const unmountChildren = (children, doRemove = false) => {
     for (let i = 0; i < children.length; i++) {
-      unmount(children[i])
+      unmount(children[i], doRemove)
     }
   }
 
@@ -459,7 +531,7 @@ export const createRenderer = (options) => {
     // i = 0, e1 = 1, e2 = -1
     else if (i > e2) {
       while (i <= e1) {
-        unmount(c1[i])
+        unmount(c1[i], true)
         i++
       }
     }
@@ -508,7 +580,7 @@ export const createRenderer = (options) => {
           patch(oldChild, c2[newIndex], container)
         } else {
           // 老的中多余部分，卸载掉
-          unmount(oldChild)
+          unmount(oldChild, true)
         }
       }
 
@@ -555,7 +627,7 @@ export const createRenderer = (options) => {
     if (vnode == null) {
       // 卸载
       if (container._vnode) {
-        unmount(container._vnode)
+        unmount(container._vnode, true)
       }
     } else {
       // 初始化或者更新的过程
