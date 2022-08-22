@@ -1,5 +1,5 @@
 import { shallowReactive, toRaw } from '@vue/reactivity'
-import { hasOwn } from '@vue/shared'
+import { hasOwn, PatchFlags } from '@vue/shared'
 
 /**
  * 初始化props
@@ -55,40 +55,50 @@ function setFullProps(instance, rawProps, props, attrs) {
 /**
  * 更新props，涉及到props、attrs的新增、修改、删除
  * 传入参数都为props原始对象
+ * 优化方式，全量更新和局部更新
  */
-export function updateProps(instance, rawProps, rawPrevProps) {
-  const { props, attrs } = instance
+export function updateProps(instance, rawProps, rawPrevProps, optimized) {
+  const {
+    props,
+    attrs,
+    vnode: { patchFlag }
+  } = instance
   // 原始值
   const rawCurrentProps = toRaw(props)
   const [options] = instance.propsOptions
 
-  // 新增及修改
-  setFullProps(instance, rawProps, props, attrs)
+  // 优化模式，并且不是FULL_PROPS的逻辑
+  if ((optimized || patchFlag > 0) && !(patchFlag & PatchFlags.FULL_PROPS)) {
+  } else {
+    // 全量更新
+    // 新增及修改
+    setFullProps(instance, rawProps, props, attrs)
 
-  // 删除操作
-  // 1. props
-  // 以前有值现新传的没有，将属性置为undefined。如果组件没有接收props就删除掉
-  for (const key in rawCurrentProps) {
-    if (!rawProps || !hasOwn(rawProps, key)) {
-      if (options) {
-        // 之前有值 置为undefined
-        if (rawPrevProps && rawPrevProps[key] !== undefined) {
-          props[key] = undefined
+    // 删除操作
+    // 1. props
+    // 以前有值现新传的没有，将属性置为undefined。如果组件没有接收props就删除掉
+    for (const key in rawCurrentProps) {
+      if (!rawProps || !hasOwn(rawProps, key)) {
+        if (options) {
+          // 之前有值 置为undefined
+          if (rawPrevProps && rawPrevProps[key] !== undefined) {
+            props[key] = undefined
+          }
+        } else {
+          // 组件没有接收props就删除掉
+          delete props[key]
         }
-      } else {
-        // 组件没有接收props就删除掉
-        delete props[key]
       }
     }
-  }
 
-  // 2. attrs
-  // 如果没有props，attrs和props就指向了同一个原始对象，这时候已经更新了
-  // 如果用户新传入的属性中，有不在attrs中的，就删除掉
-  if (attrs !== rawCurrentProps) {
-    for (const key in attrs) {
-      if (!hasOwn(rawProps, key)) {
-        delete attrs[key]
+    // 2. attrs
+    // 如果没有props，attrs和props就指向了同一个原始对象，这时候已经更新了
+    // 如果用户新传入的属性中，有不在attrs中的，就删除掉
+    if (attrs !== rawCurrentProps) {
+      for (const key in attrs) {
+        if (!hasOwn(rawProps, key)) {
+          delete attrs[key]
+        }
       }
     }
   }

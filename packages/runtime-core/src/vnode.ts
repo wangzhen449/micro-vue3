@@ -1,10 +1,10 @@
 import { isObject, isArray, isString, ShapeFlags } from '@vue/shared'
-import { isFunction } from '../../shared/src/index';
+import { isFunction } from '../../shared/src/index'
 
 export type Component = {
-  props: any,
-  vnode: VNode,
-  update: any,
+  props: any
+  vnode: VNode
+  update: any
   next: VNode
 }
 
@@ -33,6 +33,8 @@ export interface VNode {
   component: Component
   shapeFlag: number
   patchFlag: number
+  dynamicProps: string[] | null
+  dynamicChildren: VNode[] | null
 }
 
 export function isVNode(vnode: any): boolean {
@@ -44,29 +46,107 @@ export function isSameVNodeType(n1, n2) {
 }
 
 /**
+ * block 栈。
+ * 栈结构是由于会存在block嵌套block的情况。遇见block入栈，节点处理完毕出栈
+ * dynamicChildren会先存储在栈中，当block最终创建的时候，做赋值，出栈
+ */
+export const blockStack = []
+// 当前block
+export let currentBlock = null
+
+// 打开block 向栈中压入。block的第一步操作
+export function openBlock(disableTracking = false) {
+  blockStack.push((currentBlock = disableTracking ? null : []))
+}
+
+// 关闭block，block从栈中弹出，当前block前移。block执行结束，把环境还给上一层
+export function closeBlock() {
+  blockStack.pop()
+  currentBlock = blockStack[blockStack.length - 1] || null
+}
+
+// 给 dynamicChildren 赋值，出栈
+function setupBlock(vnode) {
+  vnode.dynamicChildren = currentBlock || []
+
+  // 弹出
+  closeBlock()
+
+  return vnode
+}
+
+/**
+ * 代替h函数，创建vnode。(h函数是通用方案，因此需要对参数进行判断)
+ * block作用就是收集动态节点
+ */
+export function createElementBlock(
+  type,
+  props?,
+  children?,
+  patchFlag?: number,
+  dynamicProps?: string[],
+  shapeFlag?: number
+) {
+  return setupBlock(
+    createBaseVNode(
+      type,
+      props,
+      children,
+      patchFlag,
+      dynamicProps,
+      shapeFlag,
+      true,
+    )
+  )
+}
+
+// createElementVNode 等价于 createBaseVNode
+export { createBaseVNode as createElementVNode }
+
+/**
  * v 定义VNode数据结构
  * v 根据参数处理VNode的shapeFlag类型
  * v type 有可能是 组件类型、元素类型、文本类型
  * x 规范化
  */
-export function createVNode(type, props = null, children = null) {
-
-  const shapeFlag =
-    isString(type) ? ShapeFlags.ELEMENT :
-    isObject(type) ? ShapeFlags.STATEFUL_COMPONENT :
-    isFunction(type) ? ShapeFlags.FUNCTIONAL_COMPONENT :
-    0
+export function createVNode(
+  type,
+  props = null,
+  children = null,
+  patchFlag = 0,
+  dynamicProps: string[] | null = null,
+  isBlockNode = false
+) {
+  const shapeFlag = isString(type)
+    ? ShapeFlags.ELEMENT
+    : isObject(type)
+    ? ShapeFlags.STATEFUL_COMPONENT
+    : isFunction(type)
+    ? ShapeFlags.FUNCTIONAL_COMPONENT
+    : 0
 
   // TODO class 和 style 规范化
 
-  return createBaseVNode(type, props, children, shapeFlag, true)
+  return createBaseVNode(
+    type,
+    props,
+    children,
+    patchFlag,
+    dynamicProps,
+    shapeFlag,
+    isBlockNode,
+    true
+  )
 }
 
 function createBaseVNode(
   type: any,
   props: any = null,
   children: any = null,
-  shapeFlag: number | ShapeFlags,
+  patchFlag = 0,
+  dynamicProps: string[] | null = null,
+  shapeFlag = type === Fragment ? 0 : ShapeFlags.ELEMENT,
+  isBlockNode = false,
   needFullChildrenNormalization = false
 ) {
   const vnode = {
@@ -78,18 +158,30 @@ function createBaseVNode(
     anchor: null,
     children,
     component: null,
-    shapeFlag,
-    patchFlag: 0
+    shapeFlag, // 类型标识
+    patchFlag, // 优化标识
+    dynamicProps, // 动态属性
+    dynamicChildren: null // 动态子节点
   }
 
   // children规范化
   if (needFullChildrenNormalization) {
     normalizeChildren(vnode, children)
   } else if (children) {
+    // complier编译后的会走这里
     // 如果传了子元素，只能是字符串或者数组
     vnode.shapeFlag |= isString(children)
       ? ShapeFlags.TEXT_CHILDREN
       : ShapeFlags.ARRAY_CHILDREN
+  }
+
+  // 有currentBlock，并且当前有动态标记，向栈中插入当前vnode
+  if (
+    // 避免block收集自身
+    !isBlockNode &&
+    currentBlock && vnode.patchFlag > 0
+  ) {
+    currentBlock.push(vnode)
   }
 
   return vnode
@@ -125,13 +217,14 @@ export function normalizeChildren(vnode, children) {
   } else if (isArray(children)) {
     // 数组children
     type = ShapeFlags.ARRAY_CHILDREN
-  } else if (typeof children === 'object') { // 不可以是null
+  } else if (typeof children === 'object') {
+    // 不可以是null
     // slots
     type = ShapeFlags.SLOTS_CHILDREN
     // TODO 为children 设置 _ctx 上下文
   } else if (isFunction(children)) {
     // slots
-    children = {default: children}
+    children = { default: children }
     type = ShapeFlags.SLOTS_CHILDREN
   } else {
     // number string等 都按照字符串处理

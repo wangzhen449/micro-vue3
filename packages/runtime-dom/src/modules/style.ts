@@ -18,7 +18,7 @@ export function patchStyle(el: Element, prev: String, next: String) {
     // 删除
     if (prev && !isString(prev)) {
       for (const key in prev) {
-        if (next[key] !== null) {
+        if (next[key] == null) {
           setStyle(style, key, '')
         }
       }

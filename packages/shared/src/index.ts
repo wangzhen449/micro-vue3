@@ -1,4 +1,6 @@
 export * from './shapeFlags'
+export * from './patchFlags'
+export * from './toDisplayString'
 
 const onRE = /^on[^a-z]/
 export const isOn = (key) => onRE.test(key)

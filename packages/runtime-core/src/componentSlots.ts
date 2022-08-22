@@ -15,7 +15,7 @@ export function initSlots(instance, children) {
 }
 
 // 更新slots
-export function updateSlots(instance, children) {
+export function updateSlots(instance, children, optimized) {
   const { vnode, slots } = instance
   // 是否需要删除
   let needDeletionCheck = true
