@@ -124,8 +124,84 @@ function parseInterpolation(context) {
   }
 }
 
+/**
+ * parse 元素
+ * 1. 处理开始标签
+ * 2. 处理标签内部内容，遇到子元素进行递归调用，从而构建抽象语法树
+ * 3. 处理结束标签 更新开始到结束的位置
+ * 4. 返回 元素对象
+ */
 function parseElement(context) {
+  // 1. 处理开始标签
+  const element = parseTag(context, TagType.Start)
+  // 自关闭标签
+  if (element.isSelfClosing) {
+    return element
+  }
 
+  // 2. 处理标签内部内容。递归调用
+  const children = parseChildren(context)
+  // 父节点添加子节点信息
+  element.children = children
+
+  // 3. 处理结束标签
+  // 如果是结束标签
+  if (startsWithEndTagOpen(context.source, element.tag)) {
+    parseTag(context, TagType.End)
+  }
+  // element上面保存的还是开始标签的位置。到结束标签之后，需要更新位置到结束标签
+  element.loc = getSelection(context, element.loc.start)
+
+  return element
+}
+
+const enum TagType {
+  Start,
+  End
+}
+
+/**
+ * 处理标签
+ * 1. 处理标签open <div </div
+ * 2. 处理元素属性
+ * 3. 处理标签close > />
+ * 4. 返回 元素对象。标签结束无返回 </div>
+ */
+function parseTag(context, type) {
+  // 标签开始
+  const start = getCursor(context)
+  const match = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source)
+  // 标签名
+  const tag = match[1]
+  // 截掉标签名 <div 或 </div
+  advanceBy(context, match[0].length)
+  advanceSpaces(context)
+
+  // 处理元素属性
+  const props = parseAttributes(context, type)
+
+  // 标签结束
+  let isSelfClosing = false
+  // 自关闭标签
+  if (context.source.startsWith('/>')) {
+    isSelfClosing = true
+  }
+  // 截掉 > 或者 />
+  advanceBy(context, isSelfClosing ? 2 : 1)
+
+  // 结束标签，直接返回
+  if (type === TagType.End) {
+    return
+  }
+
+  return {
+    type: NodeTypes.ELEMENT,
+    tag,
+    props,
+    isSelfClosing,
+    children: [],
+    loc: getSelection(context, start)
+  }
 }
 
 /**
@@ -172,6 +248,101 @@ function parseTextData(context, length) {
 }
 
 /**
+ * parse 属性
+ * 把所有属性push到props中
+ */
+ function parseAttributes(context, type) {
+  if (type === TagType.End) {
+    return
+  }
+  const props = []
+  // 循环到标签结束
+  while (
+    context.source.length > 0 &&
+    !context.source.startsWith('>') &&
+    !context.source.startsWith('/>')
+  ) {
+    const attr = parseAttribute(context)
+
+    props.push(attr)
+
+    advanceSpaces(context)
+  }
+
+  return props
+}
+
+/**
+ * parse 属性
+ * 1. 属性名
+ * 2. 属性值
+ */
+function parseAttribute(context) {
+  // 开始位置
+  const start = getCursor(context)
+  // 属性名
+  const match = /^[^\t\r\n\f />][^\t\r\n\f />=]*/.exec(context.source)
+  const name = match[0]
+  // 截取掉name
+  advanceBy(context, name.length)
+
+  // 属性值
+  let value
+  // 有等号
+  if (/^[\t\r\n\f ]*=/.test(context.source)) {
+    // 删除空格
+    advanceSpaces(context)
+    // 删除等号
+    advanceBy(context, 1)
+    // 删除空格
+    advanceSpaces(context)
+    // 解析值
+    value = parseAttributeValue(context)
+  }
+
+  return {
+    type: NodeTypes.ATTRIBUTE,
+    name,
+    value: value && {
+      type: NodeTypes.TEXT,
+      content: value.content,
+      loc: value.loc
+    },
+    loc: getSelection(context, start)
+  }
+}
+
+/**
+ * parse 值
+ * 1. 有逗号，无逗号暂不考虑
+ */
+function parseAttributeValue(context) {
+  const start = getCursor(context)
+  let content
+
+  const quote = context.source[0]
+  const isQuoted = quote === `"` || quote === `'`
+  if (isQuoted) {
+    // 有逗号
+    // 删除左逗号
+    advanceBy(context, 1)
+
+    // 右逗号位置
+    const endIndex = context.source.indexOf(quote)
+    // parse 文本，获取内容
+    content = parseTextData(context, endIndex)
+
+    // 删除右逗号
+    advanceBy(context, 1)
+  }
+
+  return {
+    content,
+    loc: getSelection(context, start)
+  }
+}
+
+/**
  * 更新context操作
  * 截取source，更新context位置信息
  */
@@ -180,6 +351,14 @@ function advanceBy(context, numberOfCharacters) {
   // 更新context位置
   advancePositionWithMutation(context, source, numberOfCharacters)
   context.source = source.slice(numberOfCharacters)
+}
+
+// 删除空格
+function advanceSpaces(context) {
+  const match = /^[\t\r\n\f ]+/.exec(context.source)
+  if (match) {
+    advanceBy(context, match[0].length)
+  }
 }
 
 // 获取截取的位置信息
@@ -201,5 +380,17 @@ function getCursor(context) {
 
 // 是否解析完毕
 function isEnd(context) {
-  return !context.source
+  // 截取完毕，或者遇到结束标签就停止（为了停止递归）
+  return !context.source || context.source.startsWith('</')
+}
+
+// 结束标签
+function startsWithEndTagOpen(source, tag) {
+  return (
+    source.startsWith('</') &&
+    // 前后标签名一致
+    source.slice(2, 2 + tag.length).toLowerCase() === tag.toLowerCase() &&
+    // > 结尾
+    /[\t\r\n\f />]/.test(source[2 + tag.length] || '>')
+  )
 }
