@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node scripts/dev.js reactivity -f global",
     "dev:dom": "node scripts/dev.js runtime-dom -f global",
+    "dev:compiler": "node scripts/dev.js compiler-core -f global",
     "test": "jest"
   },
   "keywords": [],
