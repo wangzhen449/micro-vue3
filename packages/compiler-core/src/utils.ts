@@ -1,3 +1,5 @@
+import { NodeTypes } from './ast'
+
 // 更新context位置信息
 export function advancePositionWithMutation(pos, source, numberOfCharacters) {
   // 所占行数
@@ -17,7 +19,13 @@ export function advancePositionWithMutation(pos, source, numberOfCharacters) {
 
   pos.offset += numberOfCharacters // 偏移量
   pos.line += linesCount // 行数
-  pos.column = lastNewLinePos === -1
-    ? pos.column + numberOfCharacters
-    : numberOfCharacters - lastNewLinePos // 所有位数 减去 最后一个换行结尾位置，就是column
+  pos.column =
+    lastNewLinePos === -1
+      ? pos.column + numberOfCharacters
+      : numberOfCharacters - lastNewLinePos // 所有位数 减去 最后一个换行结尾位置，就是column
+}
+
+// 是文本
+export function isText(node) {
+  return node.type === NodeTypes.INTERPOLATION || node.type === NodeTypes.TEXT
 }

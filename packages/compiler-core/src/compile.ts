@@ -1,7 +1,9 @@
 import { isString } from '@vue/shared'
 import { parse } from './parse'
-
-export function transform(ast) {}
+import { transform } from './transform'
+import { transformElement } from './transform/transformElement'
+import { transformExpression } from './transform/transformExpression'
+import { transformText } from './transform/transformText'
 
 export function generate(ast) {}
 
@@ -13,9 +15,12 @@ export function generate(ast) {}
 export function compile(template) {
   // parse
   const ast = isString(template) ? parse(template) : template
-  console.log('🚀 ~ file: compile.ts ~ line 19 ~ compile ~ ast', ast)
+
   // transform
-  transform(ast)
+  const nodeTransform = [transformExpression, transformElement, transformText]
+  transform(ast, { nodeTransform: nodeTransform })
+  console.log('🚀 ~ file: compile.ts ~ line 19 ~ compile ~ ast', ast)
+
   // generate
   return generate(ast)
 }

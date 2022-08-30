@@ -26,3 +26,21 @@ export function createRoot(children, loc) {
     loc
   }
 }
+
+// 创建组合表达式
+export function createCompoundExpression(children, loc) {
+  return {
+    type: NodeTypes.COMPOUND_EXPRESSION, // 组合表达式
+    children,
+    loc
+  }
+}
+
+// 创建调用表达式
+export function createCallExpression(callee, args) {
+  return {
+    type: NodeTypes.JS_CALL_EXPRESSION, // js调用表达式
+    callee, // 调用的方法名
+    arguments: args
+  }
+}
