@@ -1,3 +1,5 @@
+import { CREATE_ELEMENT_VNODE } from './runtimeHelpers'
+
 export const enum NodeTypes {
   ROOT, // 根节点
   ELEMENT, // 元素
@@ -15,7 +17,8 @@ export const enum NodeTypes {
   TEXT_CALL, // 文本调用
   // codegen
   VNODE_CALL, // 元素调用
-  JS_CALL_EXPRESSION // js调用表达式
+  JS_CALL_EXPRESSION, // js调用表达式
+  JS_OBJECT_EXPRESSION // js对象表达式
 }
 
 // 创建根节点 fragment
@@ -42,5 +45,24 @@ export function createCallExpression(callee, args) {
     type: NodeTypes.JS_CALL_EXPRESSION, // js调用表达式
     callee, // 调用的方法名
     arguments: args
+  }
+}
+
+// 创建对象表达式
+export function createObjectExpression(properties) {
+  return {
+    type: NodeTypes.JS_OBJECT_EXPRESSION,
+    properties
+  }
+}
+
+// 创建vnode调用
+export function createVNodeCall(context, tag, props, children) {
+  context.helper(CREATE_ELEMENT_VNODE)
+  return {
+    type: NodeTypes.VNODE_CALL, // vnode调用
+    tag,
+    props,
+    children,
   }
 }

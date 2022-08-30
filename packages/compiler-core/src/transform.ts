@@ -1,5 +1,6 @@
-import { NodeTypes } from './ast'
-import { TO_DISPLAY_STRING } from './runtimeHelpers'
+import { NodeTypes, createVNodeCall } from './ast'
+import { FRAGMENT, TO_DISPLAY_STRING } from './runtimeHelpers'
+import { makeBlock } from './utils'
 
 // 创建转换上下文
 function createTransformContext(root, { nodeTransform }) {
@@ -14,6 +15,17 @@ function createTransformContext(root, { nodeTransform }) {
       context.helpers.set(name, count + 1)
       return name
     },
+    removeHelper(name) {
+      const count = context.helpers.get(name)
+      if (count) {
+        const currentCount = count - 1
+        if (!currentCount) {
+          context.helpers.delete(name)
+        } else {
+          context.helpers.set(name, currentCount)
+        }
+      }
+    },
     nodeTransform
   }
 
@@ -24,13 +36,57 @@ function createTransformContext(root, { nodeTransform }) {
  * 1. 创建转换上下文
  * 2. 按照类型做转换
  * 3. 递归转换
+ * 4. 根节点
  */
 export function transform(root, options) {
+  // 创建转换上下文
   const context = createTransformContext(root, options)
 
   // 遍历所有节点
   traverseNode(root, context)
+
+  // 根节点
+  createRootCodegen(root, context)
+
+  root.helpers = [...context.helpers.keys()]
 }
+
+// 根节点 codegen
+function createRootCodegen(root, context) {
+  const { children } = root
+  // 只有一个子元素
+  if (children.length === 1) {
+    const child = children[0]
+
+    // 单独元素根节点
+    if (isSingleElementRoot(root, child) && child.codegenNode) {
+      const codegenNode = child.codegenNode
+      // 唯一子元素是 vnode调用，创建block
+      if (codegenNode.type === NodeTypes.VNODE_CALL) {
+        makeBlock(codegenNode, context)
+      }
+      root.codegenNode = codegenNode
+    } else {
+      // 单独文本，等
+      root.codegenNode = child
+    }
+  } else if (children.length > 1) {
+    // 多个子元素
+    root.codegenNode = createVNodeCall(
+      context,
+      context.helper(FRAGMENT),
+      null,
+      children
+    )
+  }
+}
+
+// 单个元素节点
+function isSingleElementRoot(root, child) {
+  const { children } = root
+  return children.length === 1 && child.type === NodeTypes.ELEMENT
+}
+
 /**
  * transform 遍历节点
  * 1. 调用所有nodeTransform，对于需要后置处理的，存储到退出函数集合中

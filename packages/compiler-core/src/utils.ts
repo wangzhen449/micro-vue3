@@ -1,4 +1,5 @@
 import { NodeTypes } from './ast'
+import { OPEN_BLOCK, CREATE_ELEMENT_BLOCK, CREATE_ELEMENT_VNODE } from './runtimeHelpers'
 
 // 更新context位置信息
 export function advancePositionWithMutation(pos, source, numberOfCharacters) {
@@ -29,3 +30,15 @@ export function advancePositionWithMutation(pos, source, numberOfCharacters) {
 export function isText(node) {
   return node.type === NodeTypes.INTERPOLATION || node.type === NodeTypes.TEXT
 }
+
+// 创建block
+export function makeBlock(node, { helper, removeHelper } ) {
+  if (!node.isBlock) {
+    node.isBlock = true
+    // 移除一个CREATE_ELEMENT_VNODE，换为block helper
+    removeHelper(CREATE_ELEMENT_VNODE)
+    helper(OPEN_BLOCK)
+    helper(CREATE_ELEMENT_BLOCK)
+  }
+}
+
