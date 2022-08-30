@@ -1,12 +1,9 @@
 import { isString } from '@vue/shared'
 import { parse } from './parse'
 
-
 export function transform(ast) {}
 
-export function generate(ast) {
-  console.log('hha')
-}
+export function generate(ast) {}
 
 /**
  * 1. parse 将模板转换为抽象语法树
@@ -16,7 +13,7 @@ export function generate(ast) {
 export function compile(template) {
   // parse
   const ast = isString(template) ? parse(template) : template
-  console.log("🚀 ~ file: compile.ts ~ line 19 ~ compile ~ ast", ast)
+  console.log('🚀 ~ file: compile.ts ~ line 19 ~ compile ~ ast', ast)
   // transform
   transform(ast)
   // generate

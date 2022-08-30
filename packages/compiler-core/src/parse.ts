@@ -1,5 +1,5 @@
-import { NodeTypes } from "./ast"
-import { advancePositionWithMutation } from "./utils"
+import { createRoot, NodeTypes } from './ast'
+import { advancePositionWithMutation } from './utils'
 
 /**
  * 1. 创建parse上下文
@@ -10,7 +10,7 @@ export function parse(content) {
   const context = createParserContext(content)
   const start = getCursor(context)
 
-  return parseChildren(context)
+  return createRoot(parseChildren(context), getSelection(context, start))
 }
 
 // 创建parse上下文
@@ -29,6 +29,7 @@ function createParserContext(content) {
  * {{ 表达式
  * < 标签
  * xxx 文本
+ * 去除空白节点
  */
 function parseChildren(context) {
   const nodes = []
@@ -52,7 +53,18 @@ function parseChildren(context) {
     nodes.push(node)
   }
 
-  return nodes
+  // 处理空白
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i]
+    if (node.type === NodeTypes.TEXT) {
+      if (!/[^\t\r\n\f ]/.test(node.content)) {
+        // 标记空白
+        nodes[i] = null
+      }
+    }
+  }
+
+  return nodes.filter(Boolean)
 }
 
 /**
@@ -251,7 +263,7 @@ function parseTextData(context, length) {
  * parse 属性
  * 把所有属性push到props中
  */
- function parseAttributes(context, type) {
+function parseAttributes(context, type) {
   if (type === TagType.End) {
     return
   }

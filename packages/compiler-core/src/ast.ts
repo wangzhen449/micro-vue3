@@ -8,12 +8,21 @@ export const enum NodeTypes {
   ATTRIBUTE, // 属性
   DIRECTIVE, // 指令
   // containers
-  COMPOUND_EXPRESSION, // 符合表达式 {{xxx}}aaa
+  COMPOUND_EXPRESSION, // 复合表达式 {{xxx}}aaa
   IF,
   IF_BRANCH,
   FOR,
   TEXT_CALL, // 文本调用
   // codegen
   VNODE_CALL, // 元素调用
-  JS_CALL_EXPRESSION, // js调用表达式
+  JS_CALL_EXPRESSION // js调用表达式
+}
+
+// 创建根节点 fragment
+export function createRoot(children, loc) {
+  return {
+    type: NodeTypes.ROOT,
+    children,
+    loc
+  }
 }
