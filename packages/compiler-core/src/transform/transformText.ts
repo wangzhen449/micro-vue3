@@ -62,7 +62,8 @@ export function transformText(node, context) {
           callArgs.push(child)
           // 动态节点
           if (child.type !== NodeTypes.TEXT) {
-            callArgs.push(PatchFlags.TEXT)
+            // 转为字符串
+            callArgs.push(PatchFlags.TEXT + '')
           }
 
           // 改变节点属性

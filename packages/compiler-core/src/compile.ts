@@ -1,11 +1,10 @@
 import { isString } from '@vue/shared'
+import { generate } from './codegen'
 import { parse } from './parse'
 import { transform } from './transform'
 import { transformElement } from './transform/transformElement'
 import { transformExpression } from './transform/transformExpression'
 import { transformText } from './transform/transformText'
-
-export function generate(ast) {}
 
 /**
  * 1. parse 将模板转换为抽象语法树

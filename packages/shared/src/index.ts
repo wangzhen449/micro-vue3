@@ -11,6 +11,8 @@ export const isNumber = (val: unknown): val is number => typeof val === 'number'
 
 export const isString = (val: unknown): val is string => typeof val === 'string'
 
+export const isSymbol = (val: unknown): val is symbol => typeof val === 'symbol'
+
 export const isObject = (value: unknown): value is Record<any, any> =>
   typeof value === 'object' && value !== null
 
