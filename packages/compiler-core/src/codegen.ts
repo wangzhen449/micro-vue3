@@ -43,9 +43,7 @@ function createCodegenContext(ast) {
 export function generate(ast) {
   // 创建上下文
   const context = createCodegenContext(ast)
-  const { push, indent, deindent, newline } = context
-
-  const hasHelpers = ast.helpers.length > 0
+  const { push, indent, deindent } = context
 
   // 导入方法
   genFunctionPreamble(ast, context)
@@ -59,6 +57,8 @@ export function generate(ast) {
 
   if (ast.codegenNode) {
     genNode(ast.codegenNode, context)
+  } else {
+    push('null')
   }
 
   deindent()
@@ -78,6 +78,7 @@ function genFunctionPreamble(ast, context) {
 }
 
 // children
+// 缺少换行逻辑
 function genNodeListAsArray(nodes, context) {
   context.push(`[`)
   genNodeList(nodes, context)
@@ -86,7 +87,7 @@ function genNodeListAsArray(nodes, context) {
 
 // vnode
 function genNodeList(nodes, context) {
-  const { push, newline } = context
+  const { push } = context
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i] === null ? 'null' : nodes[i]
     if (isString(node)) { // tag、text_children
