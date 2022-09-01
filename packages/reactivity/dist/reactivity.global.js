@@ -20,16 +20,24 @@ var VueReactivity = (() => {
   // packages/reactivity/src/index.ts
   var src_exports = {};
   __export(src_exports, {
+    EffectScope: () => EffectScope,
     ReactiveEffect: () => ReactiveEffect,
     ReactiveFlags: () => ReactiveFlags,
     activeEffect: () => activeEffect,
+    activeEffectScope: () => activeEffectScope,
     computed: () => computed,
     effect: () => effect,
+    effectScope: () => effectScope,
     isReactive: () => isReactive,
     isRef: () => isRef,
+    isShallow: () => isShallow,
+    proxyRefs: () => proxyRefs,
     reactive: () => reactive,
     reactiveMap: () => reactiveMap,
+    recordEffectScope: () => recordEffectScope,
     ref: () => ref,
+    shallowReactive: () => shallowReactive,
+    shallowReactiveMap: () => shallowReactiveMap,
     toRaw: () => toRaw,
     toReactive: () => toReactive,
     track: () => track,
@@ -57,6 +65,58 @@ var VueReactivity = (() => {
     return dep;
   }
 
+  // packages/reactivity/src/effectScope.ts
+  var activeEffectScope;
+  var EffectScope = class {
+    constructor(detached = false) {
+      this.active = true;
+      this.effects = [];
+      if (!detached && activeEffectScope) {
+        this.parent = activeEffectScope;
+        this.index = (activeEffectScope.scopes || (activeEffectScope.scopes = [])).push(this) - 1;
+      }
+    }
+    run(fn) {
+      if (this.active) {
+        const currentEffectScope = activeEffectScope;
+        try {
+          activeEffectScope = this;
+          return fn();
+        } finally {
+          activeEffectScope = currentEffectScope;
+        }
+      }
+    }
+    stop() {
+      if (this.active) {
+        for (let i = 0; i < this.effects.length; i++) {
+          this.effects[i].stop();
+        }
+        if (this.scopes) {
+          for (let i = 0; i < this.scopes.length; i++) {
+            this.scopes[i].stop();
+          }
+        }
+        if (this.parent) {
+          let last = this.parent.scopes.pop();
+          if (last && last !== this) {
+            this.parent.scopes[this.index] = last;
+            last.index = this.index;
+          }
+        }
+        this.active = false;
+      }
+    }
+  };
+  function effectScope(detached) {
+    return new EffectScope(detached);
+  }
+  function recordEffectScope(effect2, scope = activeEffectScope) {
+    if (scope && scope.active) {
+      scope.effects.push(effect2);
+    }
+  }
+
   // packages/reactivity/src/effect.ts
   var targetMap = /* @__PURE__ */ new WeakMap();
   var activeEffect;
@@ -67,6 +127,7 @@ var VueReactivity = (() => {
       this.active = true;
       this.deps = [];
       this.parent = void 0;
+      recordEffectScope(this);
     }
     run() {
       if (!this.active) {
@@ -164,27 +225,30 @@ var VueReactivity = (() => {
 
   // packages/reactivity/src/baseHandlers.ts
   var get = createGetter();
-  var set = createSetter();
-  var mutableHandlers = {
-    get,
-    set
-  };
-  function createGetter() {
+  var shallowGet = createGetter(true);
+  function createGetter(shallow = false) {
     return function get2(target, key, receiver) {
       if (key === "__v_isReactive" /* IS_REACTIVE */) {
         return true;
-      } else if (key === "__v_raw" /* RAW */ && receiver === reactiveMap.get(target)) {
+      } else if (key === "__v_isShallow" /* IS_SHALLOW */) {
+        return shallow;
+      } else if (key === "__v_raw" /* RAW */ && receiver === (shallow ? shallowReactiveMap : reactiveMap).get(target)) {
         return target;
       }
       const res = Reflect.get(target, key);
       track(target, key);
+      if (shallow) {
+        return res;
+      }
       if (isObject(res)) {
         return reactive(res);
       }
       return res;
     };
   }
-  function createSetter() {
+  var set = createSetter();
+  var shallowSet = createSetter(true);
+  function createSetter(shallow = false) {
     return function set2(target, key, value) {
       const oldValue = target[key];
       const result = Reflect.set(target, key, value);
@@ -194,18 +258,31 @@ var VueReactivity = (() => {
       return result;
     };
   }
+  var mutableHandlers = {
+    get,
+    set
+  };
+  var shallowReactiveHandlers = extend({}, mutableHandlers, {
+    get: shallowGet,
+    set: shallowSet
+  });
 
   // packages/reactivity/src/reactive.ts
   var ReactiveFlags = /* @__PURE__ */ ((ReactiveFlags2) => {
     ReactiveFlags2["IS_REACTIVE"] = "__v_isReactive";
+    ReactiveFlags2["IS_SHALLOW"] = "__v_isShallow";
     ReactiveFlags2["RAW"] = "__v_raw";
     return ReactiveFlags2;
   })(ReactiveFlags || {});
   var reactiveMap = /* @__PURE__ */ new WeakMap();
+  var shallowReactiveMap = /* @__PURE__ */ new WeakMap();
   function reactive(target) {
-    return createReactive(target, mutableHandlers, reactiveMap);
+    return createReactiveObject(target, mutableHandlers, reactiveMap);
   }
-  function createReactive(target, baseHandlers, proxyMap) {
+  function shallowReactive(target) {
+    return createReactiveObject(target, shallowReactiveHandlers, shallowReactiveMap);
+  }
+  function createReactiveObject(target, baseHandlers, proxyMap) {
     if (!isObject(target)) {
       return target;
     }
@@ -222,6 +299,9 @@ var VueReactivity = (() => {
   }
   function isReactive(value) {
     return !!(value && value["__v_isReactive" /* IS_REACTIVE */]);
+  }
+  function isShallow(value) {
+    return !!(value && value["__v_isShallow" /* IS_SHALLOW */]);
   }
   function toRaw(observed) {
     return observed && observed["__v_raw" /* RAW */] || observed;
@@ -279,6 +359,23 @@ var VueReactivity = (() => {
   }
   function unRef(ref2) {
     return isRef(ref2) ? ref2.value : ref2;
+  }
+  var shallowUnwrapHandlers = {
+    get: (target, key, receiver) => {
+      return unRef(Reflect.get(target, key, receiver));
+    },
+    set: (target, key, value, receiver) => {
+      const oldValue = target[key];
+      if (isRef(oldValue) && !isRef(value)) {
+        oldValue.value = value;
+        return true;
+      } else {
+        return Reflect.set(target, key, value, receiver);
+      }
+    }
+  };
+  function proxyRefs(objectWithRefs) {
+    return isReactive(objectWithRefs) ? objectWithRefs : new Proxy(objectWithRefs, shallowUnwrapHandlers);
   }
 
   // packages/reactivity/src/computed.ts

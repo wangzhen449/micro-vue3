@@ -1,5 +1,6 @@
 import { extend } from '@vue/shared';
 import { createDep, Dep } from './dep'
+import { recordEffectScope } from './effectScope';
 
 /**
  * v effect 监听函数中，多次触发相同getter，只收集一次
@@ -31,7 +32,9 @@ export class ReactiveEffect {
   parent: ReactiveEffect | undefined = undefined // 为了嵌套effect，标记上层activeEffect
 
   private deferStop?: boolean // 延迟清理的标识
-  constructor(public fn, public scheduler: EffectScheduler | null = null) {}
+  constructor(public fn, public scheduler: EffectScheduler | null = null) {
+    recordEffectScope(this)
+  }
 
   run() {
     // 如果不是被激活的状态(执行过onStop之后)，直接执行监听函数
