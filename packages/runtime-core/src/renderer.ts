@@ -32,6 +32,7 @@ export const createRenderer = (options) => {
     n2,
     container,
     anchor = null,
+    parentComponent = null,
     optimized = !!n2.dynamicChildren
   ) => {
     // 没有变化
@@ -60,14 +61,21 @@ export const createRenderer = (options) => {
         processText(n1, n2, container, anchor)
         break
       case Fragment:
-        processFragment(n1, n2, container, anchor, optimized)
+        processFragment(n1, n2, container, anchor, parentComponent, optimized)
         break
       default:
         // 元素类型
         if (shapeFlag & ShapeFlags.ELEMENT) {
-          processElement(n1, n2, container, anchor, optimized)
+          processElement(n1, n2, container, anchor, parentComponent, optimized)
         } else if (shapeFlag & ShapeFlags.COMPONENT) {
-          processComponent(n1, n2, container, anchor, optimized)
+          processComponent(
+            n1,
+            n2,
+            container,
+            anchor,
+            parentComponent,
+            optimized
+          )
         }
     }
   }
@@ -76,10 +84,17 @@ export const createRenderer = (options) => {
    * 组件流程
    * vue3 不建议使用函数式组件
    */
-  const processComponent = (n1: VNode | null, n2: VNode, container, anchor, optimized) => {
+  const processComponent = (
+    n1: VNode | null,
+    n2: VNode,
+    container,
+    anchor,
+    parentComponent,
+    optimized
+  ) => {
     if (n1 == null) {
       // 挂载组件
-      mountComponent(n2, container, anchor, optimized)
+      mountComponent(n2, container, anchor, parentComponent, optimized)
     } else {
       // 当父组件重新渲染时，会触发子组件的patch
       // 当子组件依赖的props被父组件改变的时候，就会触发组件重新渲染
@@ -94,10 +109,10 @@ export const createRenderer = (options) => {
    * 3. 为组件设置 effect，effect为渲染函数。 分为首次渲染和二次更新，二次更新依赖props的变化。
    * 4. initialVNode 是 组件vnode；而 subTree 是 组件render渲染返回的 子树vnode
    */
-  const mountComponent = (initialVNode, container, anchor, optimized) => {
+  const mountComponent = (initialVNode, container, anchor, parentComponent, optimized) => {
     // 创建组件实例
     const instance = (initialVNode.component =
-      createComponentInstance(initialVNode))
+      createComponentInstance(initialVNode, parentComponent))
 
     // 给instance赋值 proxy、render、props、attrs....
     // proxy 及 setup
@@ -116,7 +131,13 @@ export const createRenderer = (options) => {
    * 1.2.1. 调度器收集所有的要执行的任务，通过微任务异步更新
    * 2. effect 赋值给 instance.update，方便后续更新使用
    */
-  const setupRenderEffect = (instance, initialVNode, container, anchor, optimized) => {
+  const setupRenderEffect = (
+    instance,
+    initialVNode,
+    container,
+    anchor,
+    optimized
+  ) => {
     // 首次渲染和更新都要走这个函数，通过isMounted判断
     const componentUpdateFn = () => {
       // 首次渲染
@@ -129,8 +150,8 @@ export const createRenderer = (options) => {
         }
         // 组件的vnode 将组件实例转化为vnode
         const subTree = (instance.subTree = renderComponentRoot(instance))
-        // 将subTree渲染为真是节点
-        patch(null, subTree, container, anchor)
+        // 将subTree渲染为真是节点；instance是subTree的 parent
+        patch(null, subTree, container, anchor, instance)
 
         // 执行mounted
         if (m) {
@@ -160,7 +181,7 @@ export const createRenderer = (options) => {
         const prevTree = instance.subTree
         instance.subTree = nextTree
         // 前后vnode进行patch比较
-        patch(prevTree, nextTree, container, anchor)
+        patch(prevTree, nextTree, container, anchor, instance)
         next.el = nextTree.el
 
         // 执行Updated
@@ -250,6 +271,7 @@ export const createRenderer = (options) => {
     n2: VNode,
     container,
     anchor,
+    parentComponent,
     optimized
   ) => {
     // 起止位置就是从 n1 到 n1的下一个
@@ -265,7 +287,13 @@ export const createRenderer = (options) => {
       hostInsert(fragmentStartAnchor, container, anchor)
       hostInsert(fragmentEndAnchor, container, anchor)
 
-      mountChildren(n2.children, container, fragmentEndAnchor, optimized)
+      mountChildren(
+        n2.children,
+        container,
+        fragmentEndAnchor,
+        parentComponent,
+        optimized
+      )
     } else {
       // 子元素顺序不变的Fragment
       // v-for="i in 10" 常数数组；或者普通fragment
@@ -275,10 +303,22 @@ export const createRenderer = (options) => {
         dynamicChildren &&
         n1.dynamicChildren
       ) {
-        patchBlockChildren(n1.dynamicChildren, dynamicChildren, container)
+        patchBlockChildren(
+          n1.dynamicChildren,
+          dynamicChildren,
+          container,
+          parentComponent
+        )
       } else {
         // 不能使用优化方式
-        patchChildren(n1, n2, container, anchor, optimized)
+        patchChildren(
+          n1,
+          n2,
+          container,
+          fragmentEndAnchor,
+          parentComponent,
+          optimized
+        )
       }
     }
   }
@@ -307,14 +347,15 @@ export const createRenderer = (options) => {
     n2: VNode,
     container,
     anchor,
+    parentComponent,
     optimized
   ) => {
     // 初始化过程
     if (n1 === null) {
-      mountElement(n2, container, anchor, optimized)
+      mountElement(n2, container, anchor, parentComponent, optimized)
     } else {
       // 修改的过程
-      patchElement(n1, n2, optimized)
+      patchElement(n1, n2, parentComponent, optimized)
     }
   }
 
@@ -323,7 +364,7 @@ export const createRenderer = (options) => {
    * 1. patch children
    * 2. patch props
    */
-  const patchElement = (n1, n2, optimized) => {
+  const patchElement = (n1, n2, parentComponent, optimized) => {
     const el = (n2.el = n1.el)
     let { patchFlag, dynamicChildren } = n2
 
@@ -333,12 +374,12 @@ export const createRenderer = (options) => {
     // 有动态节点
     if (dynamicChildren) {
       // block的动态节点patch
-      patchBlockChildren(n1.dynamicChildren, dynamicChildren, el)
+      patchBlockChildren(n1.dynamicChildren, dynamicChildren, el, parentComponent)
     } else if (!optimized) {
       // 不使用优化
 
       // patch children 这里的容器要传入el
-      patchChildren(n1, n2, el, null, optimized)
+      patchChildren(n1, n2, el, null, parentComponent, optimized)
     }
 
     // 有动态内容
@@ -397,7 +438,12 @@ export const createRenderer = (options) => {
    * 动态节点，oldVNode和newVNode 位置是一样的。所以可以用下面的方式比较。
    * 除了一些 v-if 和 v-for等特殊情况
    */
-  const patchBlockChildren = (oldChildren, newChildren, el) => {
+  const patchBlockChildren = (
+    oldChildren,
+    newChildren,
+    el,
+    parentComponent
+  ) => {
     for (let i = 0; i < newChildren.length; i++) {
       const oldVNode = oldChildren[i]
       const newVNode = newChildren[i]
@@ -413,7 +459,7 @@ export const createRenderer = (options) => {
           ? hostParentNode(oldVNode.el)
           : el
 
-      patch(oldVNode, newVNode, container, null, true)
+      patch(oldVNode, newVNode, container, null, parentComponent, true)
     }
   }
 
@@ -442,7 +488,7 @@ export const createRenderer = (options) => {
   /**
    * mount的过程 创建元素、处理子元素、处理props、插入元素。
    */
-  const mountElement = (vnode: VNode, container, anchor, optimized) => {
+  const mountElement = (vnode: VNode, container, anchor, parentComponent, optimized) => {
     let el
     const { type, props, shapeFlag } = vnode
 
@@ -457,7 +503,7 @@ export const createRenderer = (options) => {
       hostSetElementText(el, vnode.children as string)
     } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
       // children 是 数组
-      mountChildren(vnode.children, el, anchor, optimized)
+      mountChildren(vnode.children, el, anchor, parentComponent, optimized)
     }
 
     // 处理属性props，通过patchProp处理props
@@ -474,7 +520,14 @@ export const createRenderer = (options) => {
   /**
    * 挂载children
    */
-  const mountChildren = (children, container, anchor, optimized, start = 0) => {
+  const mountChildren = (
+    children,
+    container,
+    anchor,
+    parentComponent,
+    optimized,
+    start = 0
+  ) => {
     for (let i = start; i < children.length; i++) {
       // 规范化child
 
@@ -482,7 +535,7 @@ export const createRenderer = (options) => {
       let child = (children[i] = normalizeVNode(children[i]))
 
       // 递归patch
-      patch(null, child, container, anchor, optimized)
+      patch(null, child, container, anchor, parentComponent, optimized)
     }
   }
 
@@ -490,7 +543,14 @@ export const createRenderer = (options) => {
    * patch children
    * 1. 优化模式下，可以区别 有key的fragment 和 无key的fragment
    */
-  const patchChildren = (n1, n2, container, anchor, optimized) => {
+  const patchChildren = (
+    n1,
+    n2,
+    container,
+    anchor,
+    parentComponent,
+    optimized
+  ) => {
     const c1 = n1 && n1.children
     const preShapeFlag = n1 ? n1.shapeFlag : 0
 
@@ -500,10 +560,24 @@ export const createRenderer = (options) => {
     if (patchFlag > 0) {
       if (patchFlag & PatchFlags.KEYED_FRAGMENT) {
         // 部分有key
-        patchKeyedChildren(c1, c2, container, anchor, optimized)
+        patchKeyedChildren(
+          c1,
+          c2,
+          container,
+          anchor,
+          parentComponent,
+          optimized
+        )
       } else if (patchFlag & PatchFlags.UNKEYED_FRAGMENT) {
         // 无 key fragment
-        patchUnkeyedChildren(c1, c2, container, anchor, optimized)
+        patchUnkeyedChildren(
+          c1,
+          c2,
+          container,
+          anchor,
+          parentComponent,
+          optimized
+        )
       }
     }
 
@@ -522,7 +596,14 @@ export const createRenderer = (options) => {
       if (preShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
         // n2 array  full diff
         if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-          patchKeyedChildren(c1, c2, container, anchor, optimized)
+          patchKeyedChildren(
+            c1,
+            c2,
+            container,
+            anchor,
+            parentComponent,
+            optimized
+          )
         } else {
           // n2 null
           unmountChildren(c1, true)
@@ -534,14 +615,21 @@ export const createRenderer = (options) => {
           hostSetElementText(container, '')
         }
         if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-          mountChildren(c2, container, anchor, optimized)
+          mountChildren(c2, container, anchor, parentComponent, optimized)
         }
       }
     }
   }
 
   // 无key children，只能暴力patch
-  const patchUnkeyedChildren = (c1, c2, container, anchor, optimized) => {
+  const patchUnkeyedChildren = (
+    c1,
+    c2,
+    container,
+    anchor,
+    parentComponent,
+    optimized
+  ) => {
     const oldLength = c1.length
     const newLength = c2.length
     const commonLength = Math.min(oldLength, newLength)
@@ -549,7 +637,7 @@ export const createRenderer = (options) => {
     // 相同长度的部分直接比较
     for (let i = 0; i < commonLength; i++) {
       const nextChild = (c2[i] = normalizeVNode(c2[i]))
-      patch(c1[i], nextChild, container, null, optimized)
+      patch(c1[i], nextChild, container, null, parentComponent, optimized)
     }
 
     if (oldLength > newLength) {
@@ -557,167 +645,195 @@ export const createRenderer = (options) => {
       unmountChildren(c1, true, commonLength)
     } else {
       // 挂载
-      mountChildren(c2, container, anchor, optimized, commonLength)
+      mountChildren(
+        c2,
+        container,
+        anchor,
+        parentComponent,
+        optimized,
+        commonLength
+      )
     }
   }
 
-    // 数组 diff 核心算法
-    const patchKeyedChildren = (c1, c2, container, parentAnchor, optimized) => {
-      let i = 0
-      let l2 = c2.length
-      let e1 = c1.length - 1
-      let e2 = l2 - 1
+  // 数组 diff 核心算法
+  const patchKeyedChildren = (
+    c1,
+    c2,
+    container,
+    parentAnchor,
+    parentComponent,
+    optimized
+  ) => {
+    let i = 0
+    let l2 = c2.length
+    let e1 = c1.length - 1
+    let e2 = l2 - 1
 
-      // 1. 起始位置类型相同
-      // (a b) c
-      // (a b) d e
-      while (i <= e1 && i <= e2) {
-        const n1 = c1[i]
-        // c2节点未被处理过
-        const n2 = (c2[i] = normalizeVNode(c2[i]))
-        if (isSameVNodeType(n1, n2)) {
-          patch(n1, n2, container, null, optimized)
-        } else {
-          break
-        }
-        i++
+    // 1. 起始位置类型相同
+    // (a b) c
+    // (a b) d e
+    while (i <= e1 && i <= e2) {
+      const n1 = c1[i]
+      // c2节点未被处理过
+      const n2 = (c2[i] = normalizeVNode(c2[i]))
+      if (isSameVNodeType(n1, n2)) {
+        patch(n1, n2, container, null, parentComponent, optimized)
+      } else {
+        break
       }
+      i++
+    }
 
-      // 2. 结束位置类型相同
-      // a (b c)
-      // d e (b c)
-      while (i <= e1 && i <= e2) {
-        const n1 = c1[e1]
-        // c2节点未被处理过
-        const n2 = (c2[e2] = normalizeVNode(c2[e2]))
-        if (isSameVNodeType(n1, n2)) {
-          patch(n1, n2, container, null, optimized)
-        } else {
-          break
-        }
-        e1--
-        e2--
+    // 2. 结束位置类型相同
+    // a (b c)
+    // d e (b c)
+    while (i <= e1 && i <= e2) {
+      const n1 = c1[e1]
+      // c2节点未被处理过
+      const n2 = (c2[e2] = normalizeVNode(c2[e2]))
+      if (isSameVNodeType(n1, n2)) {
+        patch(n1, n2, container, null, parentComponent, optimized)
+      } else {
+        break
       }
+      e1--
+      e2--
+    }
 
-      // 3. 旧序列已patch完，新序列中仍有新增节点 mount
-      // (a b)
-      // (a b) c d
-      // i = 2, e1 = 1, e2 = 3
-      // (a b)
-      // c d (a b)
-      // i = 0, e1 = -1, e2 = 1
-      // 插入节点必须依赖anchor
-      if (i > e1) {
-        if (i <= e2) {
-          // 第一种情况 i 右移
-          // 第二种情况 e2 左移
-          // while (i <= e2) {
-          //   if (i > 0) {
-          //     patch(null, (c2[i] = normalizeVNode(c2[i])), container)
-          //     i++
-          //   } else { // i = 0
-          //     const nextEl = c2[e2 + 1].el
-          //     patch(null, (c2[e2] = normalizeVNode(c2[e2])), container, nextEl)
-          //     e2--
-          //   }
-          // }
+    // 3. 旧序列已patch完，新序列中仍有新增节点 mount
+    // (a b)
+    // (a b) c d
+    // i = 2, e1 = 1, e2 = 3
+    // (a b)
+    // c d (a b)
+    // i = 0, e1 = -1, e2 = 1
+    // 插入节点必须依赖anchor
+    if (i > e1) {
+      if (i <= e2) {
+        // 第一种情况 i 右移
+        // 第二种情况 e2 左移
+        // while (i <= e2) {
+        //   if (i > 0) {
+        //     patch(null, (c2[i] = normalizeVNode(c2[i])), container)
+        //     i++
+        //   } else { // i = 0
+        //     const nextEl = c2[e2 + 1].el
+        //     patch(null, (c2[e2] = normalizeVNode(c2[e2])), container, nextEl)
+        //     e2--
+        //   }
+        // }
 
-          // 这种方式更好
-          const nextPos = e2 + 1
-          const anchor = nextPos < l2 ? c2[nextPos].el : parentAnchor
-          while (i <= e2) {
-            patch(null, (c2[i] = normalizeVNode(c2[i])), container, anchor, optimized)
-            i++
-          }
-        }
-      }
-
-      // 4. 新序列已patch完，旧序列中有多余节点 unmount
-      // (a b) c d
-      // (a b)
-      // i = 2, e1 = 3, e2 = 1
-      // c d (a b)
-      // (a b)
-      // i = 0, e1 = 1, e2 = -1
-      else if (i > e2) {
-        while (i <= e1) {
-          unmount(c1[i], true)
+        // 这种方式更好
+        const nextPos = e2 + 1
+        const anchor = nextPos < l2 ? c2[nextPos].el : parentAnchor
+        while (i <= e2) {
+          patch(
+            null,
+            (c2[i] = normalizeVNode(c2[i])),
+            container,
+            anchor,
+            parentComponent,
+            optimized
+          )
           i++
         }
       }
+    }
 
-      // 5. 复杂部分 乱序节点
-      // a b [c d e] f g
-      // a b [e d c h] f g
-      // i = 2, e1 = 4, e2 = 5
-      /**
-       * 1. 生成newChild key映射表
-       * 2. 根据映射表寻找oldChild 中同key元素，进行比较。
-       * 3. 移动元素位置
-       * TODO 未处理部分无key的情况
-       */
-      else {
-        let s1 = i
-        let s2 = i
+    // 4. 新序列已patch完，旧序列中有多余节点 unmount
+    // (a b) c d
+    // (a b)
+    // i = 2, e1 = 3, e2 = 1
+    // c d (a b)
+    // (a b)
+    // i = 0, e1 = 1, e2 = -1
+    else if (i > e2) {
+      while (i <= e1) {
+        unmount(c1[i], true)
+        i++
+      }
+    }
 
-        // 1. 生成newChild key映射表
-        const keyToNewIndexMap = new Map() // 有key序号集合  key值：在新序列中的序号
-        // 无key序号集合
-        // const unKeyToNewIndexMap = new Set()
+    // 5. 复杂部分 乱序节点
+    // a b [c d e] f g
+    // a b [e d c h] f g
+    // i = 2, e1 = 4, e2 = 5
+    /**
+     * 1. 生成newChild key映射表
+     * 2. 根据映射表寻找oldChild 中同key元素，进行比较。
+     * 3. 移动元素位置
+     * TODO 未处理部分无key的情况
+     */
+    else {
+      let s1 = i
+      let s2 = i
 
-        for (i = s2; i <= e2; i++) {
-          const nextChild = (c2[i] = normalizeVNode(c2[i]))
-          // 具备key属性
-          if (nextChild.key !== null) {
-            keyToNewIndexMap.set(nextChild.key, i)
-          } else {
-            // unKeyToNewIndexMap.add(i)
-          }
+      // 1. 生成newChild key映射表
+      const keyToNewIndexMap = new Map() // 有key序号集合  key值：在新序列中的序号
+      // 无key序号集合
+      // const unKeyToNewIndexMap = new Set()
+
+      for (i = s2; i <= e2; i++) {
+        const nextChild = (c2[i] = normalizeVNode(c2[i]))
+        // 具备key属性
+        if (nextChild.key !== null) {
+          keyToNewIndexMap.set(nextChild.key, i)
+        } else {
+          // unKeyToNewIndexMap.add(i)
         }
+      }
 
-        // 2. 根据映射表寻找oldChild 中同key元素，进行比较。找到就patch，找不到卸载
-        const toBePatched = e2 - s2 + 1 // 新的乱序部分总个数
-        // 相同key元素，新index与老index映射，未找到为0。新index从0开始，老index为和0(未找到)区分，都会加1
-        const newIndexToOldIndexMap = new Array(toBePatched).fill(0)
-        for (i = s1; i <= e1; i++) {
-          const oldChild = c1[i]
-          let newIndex = keyToNewIndexMap.get(oldChild.key)
-          // old中有相同key的元素
-          if (newIndex !== undefined) {
-            // - s2就是为了从0开始；值为了和0区分，都加1处理。
-            newIndexToOldIndexMap[newIndex - s2] = i + 1
+      // 2. 根据映射表寻找oldChild 中同key元素，进行比较。找到就patch，找不到卸载
+      const toBePatched = e2 - s2 + 1 // 新的乱序部分总个数
+      // 相同key元素，新index与老index映射，未找到为0。新index从0开始，老index为和0(未找到)区分，都会加1
+      const newIndexToOldIndexMap = new Array(toBePatched).fill(0)
+      for (i = s1; i <= e1; i++) {
+        const oldChild = c1[i]
+        let newIndex = keyToNewIndexMap.get(oldChild.key)
+        // old中有相同key的元素
+        if (newIndex !== undefined) {
+          // - s2就是为了从0开始；值为了和0区分，都加1处理。
+          newIndexToOldIndexMap[newIndex - s2] = i + 1
 
-            patch(oldChild, c2[newIndex], container, null, optimized)
-          } else {
-            // 老的中多余部分，卸载掉
-            unmount(oldChild, true)
-          }
+          patch(
+            oldChild,
+            c2[newIndex],
+            container,
+            null,
+            parentComponent,
+            optimized
+          )
+        } else {
+          // 老的中多余部分，卸载掉
+          unmount(oldChild, true)
         }
+      }
 
-        // 3.移动元素位置
-        // 从后向前循环的原因在于，移动操作需要依赖后面元素的el，所以必须保证后面的元素已经移动或者已挂载后，才能操作前面的。
-        const increasingNewIndexSequence = getSequence(newIndexToOldIndexMap)
-        let j = increasingNewIndexSequence.length - 1
-        for (i = toBePatched - 1; i >= 0; i--) {
-          const index = i + s2 // newChild真实序号
-          let current = c2[index]
-          let anchor = index + 1 < l2 ? c2[index + 1].el : null // 参照物是下一个或者null
-          if (newIndexToOldIndexMap[i] === 0) {
-            // 未在oldChild中出现过，需要挂载
-            patch(null, current, container, anchor, optimized)
+      // 3.移动元素位置
+      // 从后向前循环的原因在于，移动操作需要依赖后面元素的el，所以必须保证后面的元素已经移动或者已挂载后，才能操作前面的。
+      const increasingNewIndexSequence = getSequence(newIndexToOldIndexMap)
+      let j = increasingNewIndexSequence.length - 1
+      for (i = toBePatched - 1; i >= 0; i--) {
+        const index = i + s2 // newChild真实序号
+        let current = c2[index]
+        let anchor = index + 1 < l2 ? c2[index + 1].el : null // 参照物是下一个或者null
+        if (newIndexToOldIndexMap[i] === 0) {
+          // 未在oldChild中出现过，需要挂载
+          patch(null, current, container, anchor, parentComponent, optimized)
+        } else {
+          // 最大上升子序 从后向前查找，找到就略过
+          if (j < 0 || i !== increasingNewIndexSequence[j]) {
+            // 移动位置
+            move(current, container, anchor)
           } else {
-            // 最大上升子序 从后向前查找，找到就略过
-            if (j < 0 || i !== increasingNewIndexSequence[j]) {
-              // 移动位置
-              move(current, container, anchor)
-            } else {
-              console.log(110, i)
-              j--
-            }
+            console.log(110, i)
+            j--
           }
         }
       }
     }
+  }
 
   // doRemove 只是一个是否执行删除 dom 的标识，false的情况也是通过其他方式替换了。
   const unmount = (vnode, doRemove = false) => {
@@ -789,7 +905,7 @@ export const createRenderer = (options) => {
       }
     } else {
       // 初始化或者更新的过程
-      patch(container._vnode || null, vnode, container)
+      patch(container._vnode || null, vnode, container, null, null)
     }
     // 为容器绑定vnode (下次进入时，这里就存储了上次绑定的值)
     container._vnode = vnode

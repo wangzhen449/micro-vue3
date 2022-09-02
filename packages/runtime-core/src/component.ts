@@ -28,10 +28,11 @@ let uid = 0
 
 export let currentInstance = null
 
-export function createComponentInstance(vnode: VNode) {
+export function createComponentInstance(vnode: VNode, parent) {
   const { type } = vnode
   const instance = {
     uid: uid++,
+    parent,
     type,
     vnode,
     next: null, // 记录n2
@@ -41,6 +42,9 @@ export function createComponentInstance(vnode: VNode) {
     ctx: {},
     render: null,
     proxy: null,
+
+    // 通过链的方式 获取到父组件注册的属性
+    provides: parent ? parent.provides : Object.create(null),
 
     propsOptions: [(type as Component).props],
     props: {},
