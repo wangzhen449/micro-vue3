@@ -5,7 +5,7 @@ import {
   renderComponentRoot,
   shouldUpdateComponent
 } from './componentRenderUtils'
-import { Fragment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode'
+import { Fragment, Comment, isSameVNodeType, normalizeVNode, Text, VNode } from './vnode'
 import { queueJob } from './scheduler'
 import { updateProps } from './componentProps'
 import { updateSlots } from './componentSlots'
@@ -21,7 +21,8 @@ export const createRenderer = (options) => {
     setText: hostSetText,
     setElementText: hostSetElementText,
     parentNode: hostParentNode,
-    nextSibling: hostNextSibling
+    nextSibling: hostNextSibling,
+    createComment: hostCreateComment
   } = options
 
   /**
@@ -60,6 +61,9 @@ export const createRenderer = (options) => {
       case Text:
         processText(n1, n2, container, anchor)
         break
+      case Comment:
+        processCommentNode(n1, n2, container, anchor)
+        break
       case Fragment:
         processFragment(n1, n2, container, anchor, parentComponent, optimized)
         break
@@ -83,6 +87,20 @@ export const createRenderer = (options) => {
             n1, n2, container, anchor, parentComponent, optimized, internals
           )
         }
+    }
+  }
+
+  // 注释流程
+  const processCommentNode = (n1, n2, container, anchor) => {
+    if (n1 == null) {
+      hostInsert(
+        (n2.el = hostCreateComment(n2.children || '')),
+        container,
+        anchor
+      )
+    } else {
+      // 无需过多操作
+      n2.el = n1.el
     }
   }
 
@@ -159,6 +177,8 @@ export const createRenderer = (options) => {
         // 将subTree渲染为真是节点；instance是subTree的 parent
         patch(null, subTree, container, anchor, instance)
 
+        // 将subTree的el 赋值给组件，否则组件没有el，在patch的时候会出问题
+        initialVNode.el = subTree.el
         // 执行mounted
         if (m) {
           invokeArrayFns(m)

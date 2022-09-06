@@ -9,11 +9,13 @@ export type Component = {
   next: VNode
 }
 
-export type VNodeTypes = string | VNode | Component | Text | typeof Fragment
+export type VNodeTypes = string | VNode | Component | Text | typeof Fragment | typeof Comment
 
-export const Text = Symbol(undefined)
+export const Text = Symbol('Text')
 
-export const Fragment = Symbol()
+export const Fragment = Symbol('Fragment')
+
+export const Comment = Symbol('Comment')
 
 type VNodeChildAtom = VNode | string | number | boolean | null | undefined
 
@@ -194,8 +196,10 @@ function createBaseVNode(
  * 规范化child
  */
 export function normalizeVNode(child: VNodeChild) {
-  if (child === null || typeof child === 'boolean') {
+  // 使用 ==, 是因为异步组件的第一次渲染这里返回的是undefined，为了兼容undefined
+  if (child == null || typeof child === 'boolean') {
     // 这是注释
+    return createVNode(Comment)
   } else if (isArray(child)) {
     // 如果是数组，将数组放到Fragment容器中铺平
     // slots就是数组
