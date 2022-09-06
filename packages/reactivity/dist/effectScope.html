@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="../../../../core/packages/vue/dist/vue.global.prod.js"></script>
+  <script src="./reactivity.global.js"></script>
+  <script>
+    const { reactive, isReactive, effect, computed, effectScope } = VueReactivity;
+    // const { reactive, effect, computed, effectScope } = Vue
+    const state = reactive({num: 1})
+
+    const scope = effectScope()
+
+    scope.run(() => {
+      effect(() => {
+        console.log(1000, state.num)
+      })
+
+      const scope1 = effectScope(true)
+      scope1.run(() => {
+        effect(() => {
+          console.log(3000, state.num)
+        })
+      })
+    })
+
+    scope.stop()
+
+    setTimeout(() => {
+      state.num++
+    })
+
+    const array = Array.from(Array(300000), (v, k) => k)
+    let length = array.length
+    console.time()
+    // 3 - 4ms
+    for (let i = 0; i < length; i++) {
+      let last = array.pop()
+      if (i !== last) {
+        array[i] = last
+      }
+    }
+    // 17 - 18ms
+    // for (let i = length - 1; i >= 0; i--) {
+    //   array.splice(i, 1)
+    // }
+    console.log(array)
+    console.timeEnd()
+
+    let jin = 500000;
+    let year = 30;
+    // for (let i = 1; i <= year; i++) {
+    //   let li = jin * 0.01;
+    //   jin += li;
+    //   console.log("🚀" + i, li, jin)
+    // }
+    let li = 0
+    for (let i = 1; i <= year; i++) {
+      li += jin * 0.04;
+      if (i % 3 == 0) {
+        jin += li
+        console.log(i, li, jin)
+        li = 0
+      }
+    }
+    jin += li
+    console.log(jin)
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="../../../../core/packages/vue/dist/vue.global.prod.js"></script>
+  <!-- <script src="../../../node_modules/vue/dist/vue.global.js"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, h, ref, Text, Fragment } = VueRuntimeDom
+    // const { render, h, Static, Text, Fragment, ref } = Vue
+    const app = document.getElementById("app")
+
+    const vueComp = {
+      props: {
+        sex: String
+      },
+      setup(props) {
+        let name = ref('小明')
+        let age = ref(12)
+
+        return {
+          name,
+          age,
+        }
+
+        // return () => h(Fragment, [name.value, age.value, props.sex])
+      },
+      render() {
+        return h(Fragment, [this.name, this.age, this.sex])
+      }
+    }
+
+    const aComp = {
+      data() {
+        return {
+          flag: true
+        }
+      },
+      render() {
+        return h(Fragment, [
+          h('button', {onClick: () => {this.flag = !this.flag;}}, `变`),
+          h('div', String(this.flag)),
+          h(vueComp, {sex: this.flag ? '男' : '女'})
+        ])
+      }
+    }
+
+    render(
+      // h(vueComp, { sex: '男' }),
+      h(aComp),
+      app
+    )
+  </script>
+</body>
+</html>

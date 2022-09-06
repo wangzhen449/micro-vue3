@@ -1,4 +1,4 @@
-// 异步组件 在注册的时候渲染一个空组件，等到组件加载完成之后再填充组件，重新渲染
+// 异步组件 在注册的时候渲染一个空的注释组件，等到组件加载完成之后再填充组件，重新渲染
 
 import { ref } from '@vue/reactivity'
 import { isFunction } from '@vue/shared'

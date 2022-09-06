@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="../../../../core/packages/vue/dist/vue.global.prod.js"></script>
+  <!-- <script src="../../../node_modules/vue/dist/vue.global.js"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, h, ref, Text, Fragment, reactive, provide, inject } = VueRuntimeDom
+    // const { render, h, Static, Text, Fragment, ref, reactive, provide, inject } = Vue
+    const app = document.getElementById("app")
+
+    const vueComp = {
+      setup(props) {
+        const data = reactive({num: 10})
+        provide('ll', data)
+
+        setTimeout(() => {
+          data.num++
+        }, 1000)
+        return {
+          data
+        }
+
+      },
+      render() {
+        return h(aComp)
+      }
+    }
+
+    const aComp = {
+      setup() {
+        const data = reactive({name: '二'})
+
+        provide('dd', data)
+        return {
+          data
+        }
+      },
+      render() {
+        return h('h1', null, h(bComp))
+        // return h('h1', null, [this.state.name])
+      }
+    }
+
+    const bComp = {
+      setup() {
+        const state = inject('ll')
+        const data = inject('dd')
+        return {
+          state,
+          data
+        }
+      },
+      render() {
+        return h('p', null, [this.state.num, this.data.name])
+      }
+    }
+
+    let vnode = h(vueComp)
+    console.log("🚀 ~ file: provides-inject.html ~ line 63 ~ vnode", vnode)
+
+    render(
+      vnode,
+      app
+    )
+  </script>
+</body>
+</html>

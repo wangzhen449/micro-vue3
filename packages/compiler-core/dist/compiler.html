@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="../../../../core/packages/vue/dist/vue.global.prod.js"></script>
+  <!-- <script src="../../../node_modules/vue/dist/vue.global.js"></script> -->
+  <script src="./compiler-core.global.js"></script>
+  <script>
+    const { compile } = VueCompilerCore
+    // const template = `<div>abc {{ d }} {{ e }} <span></span> abc {{d}}</div>`
+    // const template = `<div>{{abc}} 123</div>`
+    const template = `<div id="123" class="name">{{abc}} 123 <span>aaa</span></div>`
+    compile(template)
+  </script>
+</body>
+</html>

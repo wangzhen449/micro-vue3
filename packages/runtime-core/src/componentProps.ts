@@ -25,6 +25,9 @@ export function initProps(instance, rawProps, isStateful) {
   if (isStateful) {
     // props 只有最外层是响应式
     instance.props = shallowReactive(props)
+  } else {
+    // 函数式组件，使用attrs作为props
+    instance.props = attrs
   }
 
   // attrs 无响应式

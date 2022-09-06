@@ -5,12 +5,7 @@ import { normalizeVNode, VNode } from './vnode'
  * 将组件实例的proxy 作为执行上下文，调用组件的render函数。这样就保证了在render中访问的this，会指向proxy
  */
 export function renderComponentRoot(instance) {
-  const {
-    type: Component,
-    vnode,
-    proxy,
-    render
-  } = instance
+  const { type: Component, vnode, props, proxy, render } = instance
   let result
 
   const proxyToUse = proxy
@@ -19,16 +14,23 @@ export function renderComponentRoot(instance) {
   if (vnode.shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
     // 使用proxy作为this调用render，返回vnode，并对vnode进行规范化。
     // 这里的proxy是 {_: instance}
-    result = normalizeVNode(
-      render!.call(proxyToUse, proxyToUse)
-    )
-  } else {}
+    result = normalizeVNode(render!.call(proxyToUse, proxyToUse))
+  } else {
+    // 函数式组件
+    // 函数式组件没有render 直接执行vnode.type
+    const render = Component
+    // 传入props
+    result = normalizeVNode(render(props))
+  }
 
   return result
 }
 
 // 是否需要更新组件
-export function shouldUpdateComponent( prevVNode: VNode, nextVNode: VNode ): boolean {
+export function shouldUpdateComponent(
+  prevVNode: VNode,
+  nextVNode: VNode
+): boolean {
   const { props: prevProps, children: prevChildren } = prevVNode
   const { props: nextProps, children: nextChildren } = nextVNode
 
@@ -36,7 +38,7 @@ export function shouldUpdateComponent( prevVNode: VNode, nextVNode: VNode ): boo
   // next slots没传 或者 后传入的slots没有 $stable hint 就进行更新
   // $stable hint 是专门为了标识 slots 不更新的
   if (prevChildren || nextChildren) {
-    if(!nextChildren || !(nextChildren as any).$stable) {
+    if (!nextChildren || !(nextChildren as any).$stable) {
       return true
     }
   }

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="root"></div>
+  <div id="abc"></div>
+  <script src="../../../../core/packages/vue/dist/vue.global.prod.js"></script>
+  <!-- <script src="../../../node_modules/vue/dist/vue.global.js"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, h, ref, Text, Fragment, reactive, Teleport} = VueRuntimeDom
+    // const { render, h, Static, Text, Fragment, ref, reactive, Teleport } = Vue
+    const app = document.getElementById("app")
+
+    const vueComp = {
+      setup() {
+        const flag = ref(true)
+
+        const handleClick = () => {
+          flag.value = false
+        }
+
+        return {
+          flag,
+          handleClick
+        }
+      },
+      render() {
+        return h('button', {onClick: this.handleClick}, this.flag ? h(Teleport, {to: '#root', disabled: false}, [123, 456, 789]) : h(Teleport, {to: '#abc', disabled: true}, [987, 654, 321]))
+      }
+    }
+
+    render(
+      h(vueComp),
+      app
+    )
+  </script>
+</body>
+</html>

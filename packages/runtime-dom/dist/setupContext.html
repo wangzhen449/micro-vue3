@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <!-- <script src="../../../../core/packages/vue/dist/vue.global.prod.js"></script> -->
+  <script src="../../../node_modules/vue/dist/vue.global.js"></script>
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, h, ref, Text, Fragment } = VueRuntimeDom
+    // const { render, h, Static, Text, Fragment, ref } = Vue
+    const app = document.getElementById("app")
+
+    const emitComp = {
+      setup(props, { emit }) {
+        let age = ref(12)
+
+        return () => h('p', {onClick: () => { emit('aaa', age.value++) }}, String(age.value) )
+      }
+    }
+
+    const slotsComp = {
+      render() {
+        return h(Fragment, [
+          this.$slots.header(),
+          h('h1', 'Main'),
+          this.$slots.footer()
+        ])
+      }
+    }
+
+    render(
+      h({
+        setup() {
+          const flag = ref(true)
+
+          setTimeout(() => {
+            flag.value = !flag.value
+          }, 500)
+
+          return {
+            flag
+          }
+        },
+        render() {
+          return h(Fragment, [
+            h(emitComp, { onAaa: (value) => {console.log(value)} }),
+            h('hr'),
+            h(slotsComp, null, this.flag ? {
+              header: () => h(Text, 'Header'),
+              footer: () => h('h1', 'Footer')
+            } : {
+              header: () => h(Text, 'Header'),
+              footer: 'nihoa'
+            })
+          ])
+        }
+      }, ),
+      app
+    )
+  </script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <!-- <script src="../../../../core/packages/vue/dist/vue.global.prod.js"></script> -->
+  <script src="../../../node_modules/vue/dist/vue.global.js"></script>
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, h, ref, Text, Fragment, reactive, computed, onBeforeMount, onMounted, onBeforeUpdate, onUpdated, getCurrentInstance } = VueRuntimeDom
+    // const { render, h, Static, Text, Fragment, reactive, computed, onBeforeMount, onMounted, onBeforeUpdate, onUpdated } = Vue
+    const app = document.getElementById("app")
+
+    const useCounter = () => {
+      const state = reactive({count: 1})
+
+      const stateHandle = (value) => {
+        state.count = value
+      }
+
+      const doubleCount = computed(() => {
+        return state.count * 2
+      })
+
+      onBeforeMount(() => {
+        const instance = getCurrentInstance()
+        console.log('onBeforeMount', instance)
+      })
+      onMounted(() => {
+        const instance = getCurrentInstance()
+        console.log('onMounted', instance)
+      })
+      onBeforeUpdate(() => {
+        const instance = getCurrentInstance()
+        console.log('onBeforeUpdate', instance)
+      })
+      onUpdated(() => {
+        const instance = getCurrentInstance()
+        console.log('onUpdated', instance)
+      })
+
+      return {
+        state,
+        doubleCount,
+        stateHandle
+      }
+    }
+
+    const vueComp = {
+      setup() {
+        const { state: counter, doubleCount, stateHandle } = useCounter()
+
+        return {
+          counter,
+          doubleCount,
+          stateHandle
+        }
+      },
+      render() {
+        return h(Fragment, [
+          h('div', {onClick: () => this.stateHandle(this.counter.count + 1)}, this.counter.count),
+          h('p', this.doubleCount)
+        ])
+      }
+    }
+
+    render(
+      h(vueComp),
+      app
+    )
+  </script>
+</body>
+</html>

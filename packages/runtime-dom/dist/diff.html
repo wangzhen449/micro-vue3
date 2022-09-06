@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <!-- <script src="https://unpkg.com/vue@next"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, h, Text } = VueRuntimeDom
+    // const { render, h, Static, Text } = Vue
+    const app = document.getElementById("app")
+
+    const hList = (arr, style = null) => {
+      return arr.map(item =>
+        h('li', {key: item, style: style}, item)
+      )
+    }
+
+
+
+    render(
+      h('ul', {style: 'color: red'},
+        hList([
+          'a',
+          'b',
+          'c',
+          'd',
+          'e',
+          'f',
+          'g',
+        ])
+        // h('li', {key: 'x'}, 'x'),
+        // h('li', {key: 'y'}, 'y'),
+        // h('li', {key: 'a'}, 'a'),
+        // h('li', {key: 'b'}, 'b'),
+        // h('li', {key: 'c'}, 'c'),
+        // h('li', {key: 'd'}, 'd'),
+        // h('li', {key: 'e'}, 'e'),
+        // h('li', {key: 'f'}, 'f'),
+        // h('li', {key: 'g'}, 'g'),
+      ),
+      app
+    )
+
+    setTimeout(() => {
+      render(
+        h('ul', {style: 'color: blue;'},
+        hList([
+          'a',
+          'b',
+          'e',
+          'c',
+          'd',
+          'h',
+          'f',
+          'g',
+        ], {background: 'pink'})
+          // h('li', {key: 'a', style: {background: 'pink'}}, 'a'),
+          // h('li', {key: 'b', style: {background: 'pink'}}, 'b'),
+          // h('li', {key: 'e', style: {background: 'pink'}}, 'e'),
+          // h('li', {key: 'd', style: {background: 'pink'}}, 'd'),
+          // h('li', {key: 'c', style: {background: 'pink'}}, 'c'),
+          // h('li', {key: 'h', style: {background: 'pink'}}, 'h'),
+          // h('li', {key: 'f', style: {background: 'pink'}}, 'f'),
+          // h('li', {key: 'g', style: {background: 'pink'}}, 'g'),
+        ),
+        app
+      )
+    }, 200)
+  </script>
+</body>
+</html>
