@@ -36,5 +36,7 @@ export const nodeOps = {
   parentNode: node => node.parentNode,
 
   // 下一个兄弟元素
-  nextSibling: node => node.nextSibling
+  nextSibling: node => node.nextSibling,
+
+  querySelector: selector => document.querySelector(selector)
 }

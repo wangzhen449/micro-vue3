@@ -68,6 +68,7 @@ export const createRenderer = (options) => {
         if (shapeFlag & ShapeFlags.ELEMENT) {
           processElement(n1, n2, container, anchor, parentComponent, optimized)
         } else if (shapeFlag & ShapeFlags.COMPONENT) {
+          // 组件类型
           processComponent(
             n1,
             n2,
@@ -75,6 +76,11 @@ export const createRenderer = (options) => {
             anchor,
             parentComponent,
             optimized
+          )
+        } else if (shapeFlag & ShapeFlags.TELEPORT) {
+          // 传送门
+          type.process(
+            n1, n2, container, anchor, parentComponent, optimized, internals
           )
         }
     }
@@ -910,6 +916,21 @@ export const createRenderer = (options) => {
     // 为容器绑定vnode (下次进入时，这里就存储了上次绑定的值)
     container._vnode = vnode
   }
+
+  // 内部构件
+  const internals = {
+    p: patch,
+    um: unmount,
+    m: move,
+    r: remove,
+    mt: mountComponent,
+    mc: mountChildren,
+    pc: patchChildren,
+    pbc: patchBlockChildren,
+    n: getNextHostNode,
+    o: options
+  }
+
   let createApp = () => {}
   return {
     render,

@@ -1,5 +1,6 @@
 import { isObject, isArray, isString, ShapeFlags } from '@vue/shared'
 import { isFunction } from '../../shared/src/index'
+import { isTeleport } from './components/teleport'
 
 export type Component = {
   props: any
@@ -119,6 +120,8 @@ export function createVNode(
 ) {
   const shapeFlag = isString(type)
     ? ShapeFlags.ELEMENT
+    : isTeleport(type)
+    ? ShapeFlags.TELEPORT
     : isObject(type)
     ? ShapeFlags.STATEFUL_COMPONENT
     : isFunction(type)
@@ -207,6 +210,10 @@ export function normalizeVNode(child: VNodeChild) {
   }
 }
 
+export function createTextVNode(text: string = '', patchFlag: number = 0) {
+  return createVNode(Text, null, text, patchFlag)
+}
+
 // 标准化children
 // 更好的处理solts、非对象函数的 children
 export function normalizeChildren(vnode, children) {
@@ -229,7 +236,14 @@ export function normalizeChildren(vnode, children) {
   } else {
     // number string等 都按照字符串处理
     children = String(children)
-    type = ShapeFlags.TEXT_CHILDREN
+
+    // teleport 需要将children 强制转换为 数组，方便移动
+    if(vnode.shapeFlag & ShapeFlags.TELEPORT) {
+      type = ShapeFlags.ARRAY_CHILDREN
+      children = [createTextVNode(children)]
+    } else {
+      type = ShapeFlags.TEXT_CHILDREN
+    }
   }
 
   vnode.children = children

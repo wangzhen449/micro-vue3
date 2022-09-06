@@ -9,5 +9,6 @@ export const enum ShapeFlags {
   TEXT_CHILDREN = 1 << 3, // vnode children 为 string类型                                   1000
   ARRAY_CHILDREN = 1 << 4, // vnode children 为 数组的类型                                  10000
   SLOTS_CHILDREN = 1 << 5, // vnode children 为 slots类型                                 100000
+  TELEPORT = 1 << 6, //  teleport
   COMPONENT = ShapeFlags.STATEFUL_COMPONENT | ShapeFlags.FUNCTIONAL_COMPONENT //            110
 }
