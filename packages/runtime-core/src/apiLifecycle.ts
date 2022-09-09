@@ -30,7 +30,7 @@ export function injectHook (type, hook, target = currentInstance) {
   }
 }
 
-export const createHooks = (lifecycle) => (hook, target) => injectHook(lifecycle, hook, target)
+export const createHooks = (lifecycle) => (hook, target = currentInstance) => injectHook(lifecycle, hook, target)
 
 export const onBeforeMount = createHooks(LifecycleHooks.BEFORE_MOUNT)
 export const onMounted = createHooks(LifecycleHooks.MOUNTED)

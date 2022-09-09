@@ -17,7 +17,7 @@ export function initProps(instance, rawProps, isStateful) {
 
   // 用户未传但是组件接收的props，置为undefined，否则会影响依赖收集
   for (const key in instance.propsOptions[0]) {
-    if (!(key in rawProps)) {
+    if (!(key in props)) {
       props[key] = undefined
     }
   }

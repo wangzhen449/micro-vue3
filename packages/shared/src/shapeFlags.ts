@@ -10,5 +10,7 @@ export const enum ShapeFlags {
   ARRAY_CHILDREN = 1 << 4, // vnode children 为 数组的类型                                  10000
   SLOTS_CHILDREN = 1 << 5, // vnode children 为 slots类型                                 100000
   TELEPORT = 1 << 6, //  teleport
+  COMPONENT_SHOULD_KEEP_ALIVE = 1 << 8, // KeepAlive
+  COMPONENT_KEPT_ALIVE = 1 << 9, // 已被缓存 KeepAlive，保持激活态
   COMPONENT = ShapeFlags.STATEFUL_COMPONENT | ShapeFlags.FUNCTIONAL_COMPONENT //            110
 }

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app"></div>
+  <!-- <script src="../../../../core/packages/vue/dist/vue.global.prod.js"></script> -->
+  <script src="../../../node_modules/vue/dist/vue.global.js"></script>
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, h, onMounted, ref, Text, Fragment, reactive, KeepAlive} = VueRuntimeDom
+    // const { render, h, onMounted, Static, Text, Fragment, ref, reactive, KeepAlive } = Vue
+    const app = document.getElementById("app")
+
+    const Comp1 = {
+      name: '1',
+      setup() {
+        onMounted(() => {
+          console.log('mount 1')
+        })
+      },
+      render(){
+        return h('div', 'Comp1')
+      }
+    }
+
+    const Comp2 = {
+      name: '2',
+      setup() {
+        onMounted(() => {
+          console.log('mount 2')
+        })
+      },
+      render(){
+        return h('div', 'Comp2')
+      }
+    }
+
+    const Comp3 = {
+      name: '2',
+      setup() {
+        onMounted(() => {
+          console.log('mount 3')
+        })
+      },
+      render(){
+        return h('div', 'Comp3')
+      }
+    }
+
+    let obj = {
+      include: '2',
+      max: 2
+    }
+
+    render(
+      h(KeepAlive, obj, {default: () => h(Comp1, {key: 1})}),
+      app
+    )
+    setTimeout(() => {
+      render(
+        h(KeepAlive, obj, {default: () => h(Comp2, {key: 2})}),
+        app
+      )
+    }, 1000)
+
+    setTimeout(() => {
+      render(
+        h(KeepAlive, obj, {default: () => h(Comp3, {key: 3})}),
+        app
+      )
+    }, 2000)
+
+    setTimeout(() => {
+      render(
+        h(KeepAlive, obj, {default: () => h(Comp1, {key: 1})}),
+        app
+      )
+    }, 3000)
+    setTimeout(() => {
+      render(
+        h(KeepAlive, obj, {default: () => h(Comp1, {key: 1})}),
+        app
+      )
+    }, 3000)
+
+    setTimeout(() => {
+      render(
+        h(KeepAlive, obj, {default: () => h(Comp3, {key: 3})}),
+        app
+      )
+    }, 4000)
+  </script>
+</body>
+</html>

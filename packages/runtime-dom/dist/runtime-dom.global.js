@@ -21,6 +21,7 @@ var VueRuntimeDom = (() => {
   var src_exports = {};
   __export(src_exports, {
     Fragment: () => Fragment,
+    KeepAlive: () => KeepAlive,
     ReactiveEffect: () => ReactiveEffect,
     ReactiveFlags: () => ReactiveFlags,
     Teleport: () => Teleport,
@@ -39,6 +40,7 @@ var VueRuntimeDom = (() => {
     h: () => h,
     inject: () => inject,
     injectHook: () => injectHook,
+    isKeepAlive: () => isKeepAlive,
     isReactive: () => isReactive,
     isRef: () => isRef,
     isShallow: () => isShallow,
@@ -473,7 +475,7 @@ var VueRuntimeDom = (() => {
     const attrs = {};
     setFullProps(instance, rawProps, props, attrs);
     for (const key in instance.propsOptions[0]) {
-      if (!(key in rawProps)) {
+      if (!(key in props)) {
         props[key] = void 0;
       }
     }
@@ -937,6 +939,152 @@ var VueRuntimeDom = (() => {
     }
   }
 
+  // packages/runtime-core/src/apiLifecycle.ts
+  function injectHook(type, hook, target = currentInstance) {
+    if (target) {
+      const hooks = target[type] || (target[type] = []);
+      const wrappeHook = (...args) => {
+        if (target.isUnmounted)
+          return;
+        setCurrentInstance(target);
+        const res = hook(...args);
+        unsetCurrentInstance();
+        return res;
+      };
+      hooks.push(wrappeHook);
+      return wrappeHook;
+    }
+  }
+  var createHooks = (lifecycle) => (hook, target = currentInstance) => injectHook(lifecycle, hook, target);
+  var onBeforeMount = createHooks("bm" /* BEFORE_MOUNT */);
+  var onMounted = createHooks("m" /* MOUNTED */);
+  var onBeforeUpdate = createHooks("bu" /* BEFORE_UPDATE */);
+  var onUpdated = createHooks("u" /* UPDATED */);
+  var onBeforeUnmount = createHooks("bum" /* BEFORE_UNMOUNT */);
+  var onUnmounted = createHooks("um" /* UNMOUNTED */);
+
+  // packages/runtime-core/src/components/KeepAlive.ts
+  var isKeepAlive = (vnode) => vnode.type.__isKeepAlive;
+  var KeepAliveImpl = {
+    __isKeepAlive: true,
+    props: {
+      include: [String, RegExp, Array],
+      exclude: [String, RegExp, Array],
+      max: [String, RegExp, Array]
+    },
+    setup(props, { slots }) {
+      const instance = getCurrentInstance();
+      const shareContext = instance.ctx;
+      const cache = /* @__PURE__ */ new Map();
+      const keys = /* @__PURE__ */ new Set();
+      let current = null;
+      const {
+        renderer: {
+          p: patch,
+          m: move,
+          um: _unmount,
+          o: { createElement }
+        }
+      } = shareContext;
+      const storageContainer = createElement("div");
+      shareContext.activate = (vnode, container, anchor, optimized) => {
+        const instance2 = vnode.component;
+        move(vnode, container, anchor);
+        patch(instance2.vnode, vnode, container, anchor, instance2, optimized);
+      };
+      shareContext.deactivate = (vnode) => {
+        move(vnode, storageContainer);
+      };
+      function unmount(vnode) {
+        resetShapeFlag(vnode);
+        _unmount(vnode, instance, true);
+      }
+      function pruneCacheEntry(key) {
+        const cached = cache.get(key);
+        if (!current || cached.type !== current.type) {
+          unmount(cached);
+        } else if (current) {
+          resetShapeFlag(cached);
+        }
+        keys.delete(key);
+        cache.delete(key);
+      }
+      let pendingCacheKey = null;
+      const cacheSubtree = () => {
+        if (pendingCacheKey != null) {
+          cache.set(pendingCacheKey, instance.subTree);
+        }
+      };
+      onMounted(cacheSubtree);
+      onUpdated(cacheSubtree);
+      onBeforeMount(() => {
+        cache.forEach((cached) => {
+          const { subTree } = instance;
+          const vnode = subTree.vnode;
+          if (cached.type === vnode.type) {
+            resetShapeFlag(cached);
+            return;
+          }
+          unmount(cached);
+        });
+      });
+      return () => {
+        pendingCacheKey = null;
+        const children = slots.default();
+        const vnode = children[0];
+        if (!isVNode(vnode) || !(vnode.shapeFlag & 4 /* STATEFUL_COMPONENT */)) {
+          current = null;
+          return vnode;
+        }
+        const comp = vnode.type;
+        const name = comp.name;
+        console.log("\u{1F680} ~ file: KeepAlive.ts ~ line 129 ~ return ~ name", name);
+        const { include, exclude, max } = props;
+        if (include && (!name || !matches(include, name)) || exclude && name && matches(exclude, name)) {
+          current = vnode;
+          return vnode;
+        }
+        const key = vnode.key == null ? comp : vnode.key;
+        const cacheVNode = cache.get(key);
+        pendingCacheKey = key;
+        if (cacheVNode) {
+          vnode.el = cacheVNode.el;
+          vnode.component = cacheVNode.component;
+          vnode.shapeFlag |= 512 /* COMPONENT_KEPT_ALIVE */;
+          keys.delete(key);
+          keys.add(key);
+        } else {
+          keys.add(key);
+          if (max && keys.size > max) {
+            pruneCacheEntry(keys.values().next().value);
+          }
+        }
+        vnode.shapeFlag |= 256 /* COMPONENT_SHOULD_KEEP_ALIVE */;
+        current = vnode;
+        return vnode;
+      };
+    }
+  };
+  var KeepAlive = KeepAliveImpl;
+  function matches(pattern, name) {
+    if (isArray(pattern)) {
+      return pattern.some((p) => matches(p, name));
+    } else if (isString(pattern)) {
+      return pattern.split(",").includes(name);
+    } else if (pattern.test) {
+      return pattern.test(name);
+    }
+  }
+  function resetShapeFlag(vnode) {
+    let shapeFlag = vnode.shapeFlag;
+    if (shapeFlag & 256 /* COMPONENT_SHOULD_KEEP_ALIVE */) {
+      shapeFlag -= 256 /* COMPONENT_SHOULD_KEEP_ALIVE */;
+    } else if (shapeFlag & 512 /* COMPONENT_KEPT_ALIVE */) {
+      shapeFlag -= 512 /* COMPONENT_KEPT_ALIVE */;
+    }
+    vnode.shapeFlag = shapeFlag;
+  }
+
   // packages/runtime-core/src/renderer.ts
   var createRenderer = (options) => {
     const {
@@ -957,7 +1105,7 @@ var VueRuntimeDom = (() => {
       }
       if (n1 && !isSameVNodeType(n1, n2)) {
         anchor = getNextHostNode(n1);
-        unmount(n1, true);
+        unmount(n1, parentComponent, true);
         n1 = null;
       }
       if (n2.patchFlag === -2 /* BAIL */) {
@@ -994,13 +1142,20 @@ var VueRuntimeDom = (() => {
     };
     const processComponent = (n1, n2, container, anchor, parentComponent, optimized) => {
       if (n1 == null) {
-        mountComponent(n2, container, anchor, parentComponent, optimized);
+        if (n2.shapeFlag & 512 /* COMPONENT_KEPT_ALIVE */) {
+          parentComponent.ctx.activate(n2, container, anchor, optimized);
+        } else {
+          mountComponent(n2, container, anchor, parentComponent, optimized);
+        }
       } else {
         updateComponent(n1, n2, optimized);
       }
     };
     const mountComponent = (initialVNode, container, anchor, parentComponent, optimized) => {
       const instance = initialVNode.component = createComponentInstance(initialVNode, parentComponent);
+      if (isKeepAlive(initialVNode)) {
+        instance.ctx.renderer = internals;
+      }
       setupComponent(instance);
       setupRenderEffect(instance, initialVNode, container, anchor, optimized);
     };
@@ -1067,7 +1222,7 @@ var VueRuntimeDom = (() => {
       }
       if (update) {
         update.active = false;
-        unmount(subTree, doRemove);
+        unmount(subTree, instance, doRemove);
       }
       if (um) {
         invokeArrayFns(um);
@@ -1209,7 +1364,7 @@ var VueRuntimeDom = (() => {
       }
       if (shapeFlag & 8 /* TEXT_CHILDREN */) {
         if (preShapeFlag & 16 /* ARRAY_CHILDREN */) {
-          unmountChildren(c1);
+          unmountChildren(c1, parentComponent);
         }
         if (c1 !== c2) {
           hostSetElementText(container, c2);
@@ -1219,7 +1374,7 @@ var VueRuntimeDom = (() => {
           if (shapeFlag & 16 /* ARRAY_CHILDREN */) {
             patchKeyedChildren(c1, c2, container, anchor, parentComponent, optimized);
           } else {
-            unmountChildren(c1, true);
+            unmountChildren(c1, parentComponent, true);
           }
         } else {
           if (preShapeFlag & 8 /* TEXT_CHILDREN */) {
@@ -1240,7 +1395,7 @@ var VueRuntimeDom = (() => {
         patch(c1[i], nextChild, container, null, parentComponent, optimized);
       }
       if (oldLength > newLength) {
-        unmountChildren(c1, true, commonLength);
+        unmountChildren(c1, parentComponent, true, commonLength);
       } else {
         mountChildren(c2, container, anchor, parentComponent, optimized, commonLength);
       }
@@ -1282,7 +1437,7 @@ var VueRuntimeDom = (() => {
         }
       } else if (i > e2) {
         while (i <= e1) {
-          unmount(c1[i], true);
+          unmount(c1[i], parentComponent, true);
           i++;
         }
       } else {
@@ -1305,7 +1460,7 @@ var VueRuntimeDom = (() => {
             newIndexToOldIndexMap[newIndex - s2] = i + 1;
             patch(oldChild, c2[newIndex], container, null, parentComponent, optimized);
           } else {
-            unmount(oldChild, true);
+            unmount(oldChild, parentComponent, true);
           }
         }
         const increasingNewIndexSequence = getSequence(newIndexToOldIndexMap);
@@ -1327,13 +1482,17 @@ var VueRuntimeDom = (() => {
         }
       }
     };
-    const unmount = (vnode, doRemove = false) => {
+    const unmount = (vnode, parentComponent, doRemove = false) => {
       const { type, children, shapeFlag } = vnode;
+      if (shapeFlag & 256 /* COMPONENT_SHOULD_KEEP_ALIVE */) {
+        parentComponent.ctx.deactivate(vnode);
+        return;
+      }
       if (shapeFlag & 6 /* COMPONENT */) {
         unmountComponent(vnode.component, doRemove);
       } else {
         if (type === Fragment && shapeFlag & 16 /* ARRAY_CHILDREN */) {
-          unmountChildren(children);
+          unmountChildren(children, parentComponent);
         }
         if (doRemove) {
           remove(vnode);
@@ -1357,9 +1516,9 @@ var VueRuntimeDom = (() => {
       }
       hostRemove(end);
     };
-    const unmountChildren = (children, doRemove = false, start = 0) => {
+    const unmountChildren = (children, parentComponent, doRemove = false, start = 0) => {
       for (let i = start; i < children.length; i++) {
-        unmount(children[i], doRemove);
+        unmount(children[i], parentComponent, doRemove);
       }
     };
     const move = (vnode, container, anchor) => {
@@ -1372,7 +1531,7 @@ var VueRuntimeDom = (() => {
     const render2 = (vnode, container) => {
       if (vnode == null) {
         if (container._vnode) {
-          unmount(container._vnode, true);
+          unmount(container._vnode, null, true);
         }
       } else {
         patch(container._vnode || null, vnode, container, null, null);
@@ -1460,30 +1619,6 @@ var VueRuntimeDom = (() => {
       return createVNode(type, propsOrChildren, children);
     }
   }
-
-  // packages/runtime-core/src/apiLifecycle.ts
-  function injectHook(type, hook, target = currentInstance) {
-    if (target) {
-      const hooks = target[type] || (target[type] = []);
-      const wrappeHook = (...args) => {
-        if (target.isUnmounted)
-          return;
-        setCurrentInstance(target);
-        const res = hook(...args);
-        unsetCurrentInstance();
-        return res;
-      };
-      hooks.push(wrappeHook);
-      return wrappeHook;
-    }
-  }
-  var createHooks = (lifecycle) => (hook, target) => injectHook(lifecycle, hook, target);
-  var onBeforeMount = createHooks("bm" /* BEFORE_MOUNT */);
-  var onMounted = createHooks("m" /* MOUNTED */);
-  var onBeforeUpdate = createHooks("bu" /* BEFORE_UPDATE */);
-  var onUpdated = createHooks("u" /* UPDATED */);
-  var onBeforeUnmount = createHooks("bum" /* BEFORE_UNMOUNT */);
-  var onUnmounted = createHooks("um" /* UNMOUNTED */);
 
   // packages/runtime-core/src/apiInject.ts
   function provide(key, value) {

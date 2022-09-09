@@ -9,6 +9,7 @@ import { Fragment, Comment, isSameVNodeType, normalizeVNode, Text, VNode } from 
 import { queueJob } from './scheduler'
 import { updateProps } from './componentProps'
 import { updateSlots } from './componentSlots'
+import { isKeepAlive } from './components/KeepAlive'
 
 // 参数 RendererOptions<HostNode, HostElement>
 export const createRenderer = (options) => {
@@ -46,7 +47,7 @@ export const createRenderer = (options) => {
       // 记录卸载元素的位置，后面的就从这个位置插入
       anchor = getNextHostNode(n1)
       // remove掉
-      unmount(n1, true)
+      unmount(n1, parentComponent, true)
       n1 = null
     }
 
@@ -117,8 +118,13 @@ export const createRenderer = (options) => {
     optimized
   ) => {
     if (n1 == null) {
-      // 挂载组件
-      mountComponent(n2, container, anchor, parentComponent, optimized)
+      // 如果是 keepAlive激活态 不直接走挂载，使用keepalive的activate，走缓存
+      if (n2.shapeFlag & ShapeFlags.COMPONENT_KEPT_ALIVE) {
+        parentComponent.ctx.activate(n2, container, anchor, optimized)
+      } else {
+        // 挂载组件
+        mountComponent(n2, container, anchor, parentComponent, optimized)
+      }
     } else {
       // 当父组件重新渲染时，会触发子组件的patch
       // 当子组件依赖的props被父组件改变的时候，就会触发组件重新渲染
@@ -137,6 +143,11 @@ export const createRenderer = (options) => {
     // 创建组件实例
     const instance = (initialVNode.component =
       createComponentInstance(initialVNode, parentComponent))
+
+    // 如果是 KeepAlive 给instance.ctx加入操作能力
+    if (isKeepAlive(initialVNode)) {
+      (instance.ctx as any).renderer = internals
+    }
 
     // 给instance赋值 proxy、render、props、attrs....
     // proxy 及 setup
@@ -276,7 +287,7 @@ export const createRenderer = (options) => {
       update.active = false
 
       // 卸载 子树
-      unmount(subTree, doRemove)
+      unmount(subTree, instance, doRemove)
     }
 
     // 执行 unmounted
@@ -611,7 +622,7 @@ export const createRenderer = (options) => {
     if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
       // n1 array
       if (preShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-        unmountChildren(c1)
+        unmountChildren(c1, parentComponent)
       }
       if (c1 !== c2) {
         hostSetElementText(container, c2 as string)
@@ -632,7 +643,7 @@ export const createRenderer = (options) => {
           )
         } else {
           // n2 null
-          unmountChildren(c1, true)
+          unmountChildren(c1, parentComponent, true)
         }
       } else {
         // n1 string | null
@@ -668,7 +679,7 @@ export const createRenderer = (options) => {
 
     if (oldLength > newLength) {
       // 卸载
-      unmountChildren(c1, true, commonLength)
+      unmountChildren(c1, parentComponent, true, commonLength)
     } else {
       // 挂载
       mountChildren(
@@ -776,7 +787,7 @@ export const createRenderer = (options) => {
     // i = 0, e1 = 1, e2 = -1
     else if (i > e2) {
       while (i <= e1) {
-        unmount(c1[i], true)
+        unmount(c1[i], parentComponent, true)
         i++
       }
     }
@@ -832,7 +843,7 @@ export const createRenderer = (options) => {
           )
         } else {
           // 老的中多余部分，卸载掉
-          unmount(oldChild, true)
+          unmount(oldChild, parentComponent, true)
         }
       }
 
@@ -862,8 +873,14 @@ export const createRenderer = (options) => {
   }
 
   // doRemove 只是一个是否执行删除 dom 的标识，false的情况也是通过其他方式替换了。
-  const unmount = (vnode, doRemove = false) => {
+  const unmount = (vnode, parentComponent, doRemove = false) => {
     const { type, children, shapeFlag } = vnode
+
+    if (shapeFlag & ShapeFlags.COMPONENT_SHOULD_KEEP_ALIVE) {
+      // keepalive的卸载，被deactivate拦截
+      parentComponent.ctx.deactivate(vnode)
+      return
+    }
 
     // 组件的卸载
     if (shapeFlag & ShapeFlags.COMPONENT) {
@@ -872,7 +889,7 @@ export const createRenderer = (options) => {
     } else {
       // Fragment 是一个容器。遍历子元素依次卸载。不给子元素的卸载不会执行dom删除，而是在remove中卸载Fragment
       if (type === Fragment && shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-        unmountChildren(children)
+        unmountChildren(children, parentComponent)
       }
 
       if (doRemove) {
@@ -903,9 +920,9 @@ export const createRenderer = (options) => {
     hostRemove(end)
   }
 
-  const unmountChildren = (children, doRemove = false, start = 0) => {
+  const unmountChildren = (children, parentComponent, doRemove = false, start = 0) => {
     for (let i = start; i < children.length; i++) {
-      unmount(children[i], doRemove)
+      unmount(children[i], parentComponent, doRemove)
     }
   }
 
@@ -927,7 +944,7 @@ export const createRenderer = (options) => {
     if (vnode == null) {
       // 卸载
       if (container._vnode) {
-        unmount(container._vnode, true)
+        unmount(container._vnode, null, true)
       }
     } else {
       // 初始化或者更新的过程

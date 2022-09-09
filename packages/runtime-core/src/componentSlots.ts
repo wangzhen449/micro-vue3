@@ -3,7 +3,7 @@ import { normalizeVNode } from './vnode'
 
 /**
  * 初始化slots
- * 1. children为对象是=时，是slots
+ * 1. children为对象是时，是slots
  * 2. 将children 规范化之后，赋值给instance.slots
  */
 export function initSlots(instance, children) {

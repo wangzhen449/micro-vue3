@@ -1,6 +1,6 @@
 import { isObject, isArray, isString, ShapeFlags } from '@vue/shared'
 import { isFunction } from '../../shared/src/index'
-import { isTeleport } from './components/teleport'
+import { isTeleport } from './components/Teleport'
 
 export type Component = {
   props: any
