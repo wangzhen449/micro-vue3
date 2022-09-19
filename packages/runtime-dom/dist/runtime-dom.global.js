@@ -20,6 +20,7 @@ var VueRuntimeDom = (() => {
   // packages/runtime-dom/src/index.ts
   var src_exports = {};
   __export(src_exports, {
+    EffectScope: () => EffectScope,
     Fragment: () => Fragment,
     KeepAlive: () => KeepAlive,
     ReactiveEffect: () => ReactiveEffect,
@@ -28,6 +29,7 @@ var VueRuntimeDom = (() => {
     TeleportMoveTypes: () => TeleportMoveTypes,
     Text: () => Text,
     activeEffect: () => activeEffect,
+    activeEffectScope: () => activeEffectScope,
     computed: () => computed,
     createApp: () => createApp,
     createElementBlock: () => createElementBlock,
@@ -36,6 +38,7 @@ var VueRuntimeDom = (() => {
     createRenderer: () => createRenderer,
     defineAsyncComponent: () => defineAsyncComponent,
     effect: () => effect,
+    effectScope: () => effectScope,
     getCurrentInstance: () => getCurrentInstance,
     h: () => h,
     inject: () => inject,
@@ -56,6 +59,7 @@ var VueRuntimeDom = (() => {
     proxyRefs: () => proxyRefs,
     reactive: () => reactive,
     reactiveMap: () => reactiveMap,
+    recordEffectScope: () => recordEffectScope,
     ref: () => ref,
     render: () => render,
     shallowReactive: () => shallowReactive,
@@ -66,11 +70,14 @@ var VueRuntimeDom = (() => {
     track: () => track,
     trackEffects: () => trackEffects,
     trackRefValue: () => trackRefValue,
+    traverse: () => traverse,
     trigger: () => trigger,
     triggerEffects: () => triggerEffects,
     triggerRef: () => triggerRef,
     triggerRefValue: () => triggerRefValue,
-    unRef: () => unRef
+    unRef: () => unRef,
+    watch: () => watch,
+    watchEffect: () => watchEffect
   });
 
   // packages/shared/src/toDisplayString.ts
@@ -105,6 +112,58 @@ var VueRuntimeDom = (() => {
     return dep;
   }
 
+  // packages/reactivity/src/effectScope.ts
+  var activeEffectScope;
+  var EffectScope = class {
+    constructor(detached = false) {
+      this.active = true;
+      this.effects = [];
+      if (!detached && activeEffectScope) {
+        this.parent = activeEffectScope;
+        this.index = (activeEffectScope.scopes || (activeEffectScope.scopes = [])).push(this) - 1;
+      }
+    }
+    run(fn) {
+      if (this.active) {
+        const currentEffectScope = activeEffectScope;
+        try {
+          activeEffectScope = this;
+          return fn();
+        } finally {
+          activeEffectScope = currentEffectScope;
+        }
+      }
+    }
+    stop() {
+      if (this.active) {
+        for (let i = 0; i < this.effects.length; i++) {
+          this.effects[i].stop();
+        }
+        if (this.scopes) {
+          for (let i = 0; i < this.scopes.length; i++) {
+            this.scopes[i].stop();
+          }
+        }
+        if (this.parent) {
+          let last = this.parent.scopes.pop();
+          if (last && last !== this) {
+            this.parent.scopes[this.index] = last;
+            last.index = this.index;
+          }
+        }
+        this.active = false;
+      }
+    }
+  };
+  function effectScope(detached) {
+    return new EffectScope(detached);
+  }
+  function recordEffectScope(effect2, scope = activeEffectScope) {
+    if (scope && scope.active) {
+      scope.effects.push(effect2);
+    }
+  }
+
   // packages/reactivity/src/effect.ts
   var targetMap = /* @__PURE__ */ new WeakMap();
   var activeEffect;
@@ -115,6 +174,7 @@ var VueRuntimeDom = (() => {
       this.active = true;
       this.deps = [];
       this.parent = void 0;
+      recordEffectScope(this);
     }
     run() {
       if (!this.active) {
@@ -137,6 +197,9 @@ var VueRuntimeDom = (() => {
         this.deferStop = true;
       } else if (this.active) {
         cleanupEffect(this);
+        if (this.onStop) {
+          this.onStop();
+        }
         this.active = false;
       }
     }
@@ -1726,6 +1789,123 @@ var VueRuntimeDom = (() => {
   function createInnerComp(comp, { vnode: { props, children } }) {
     const vnode = createVNode(comp, props, children);
     return vnode;
+  }
+
+  // packages/runtime-core/src/apiWatch.ts
+  function watchEffect(effect2, options) {
+    return doWatch(effect2, null, options);
+  }
+  function watch(source, cb, options) {
+    return doWatch(source, cb, options);
+  }
+  var EMPTY_OBJ = {};
+  function doWatch(source, cb, { immediate, deep } = EMPTY_OBJ) {
+    const instance = currentInstance;
+    let getter;
+    let forceTrigger = false;
+    let isMultiSource = false;
+    if (isRef(source)) {
+      getter = () => source.value;
+      forceTrigger = isShallow(source);
+    } else if (isReactive(source)) {
+      getter = () => source;
+      deep = true;
+    } else if (isArray(source)) {
+      isMultiSource = true;
+      forceTrigger = source.some((s) => isReactive(s) || isShallow(s));
+      getter = () => {
+        source.map((s) => {
+          if (isRef(s)) {
+            return s.value;
+          } else if (isReactive(s)) {
+            return traverse(s);
+          } else if (isFunction(s)) {
+            return s(instance);
+          }
+        });
+      };
+    } else if (isFunction(source)) {
+      if (cb) {
+        getter = () => source();
+      } else {
+        getter = () => {
+          if (instance && instance.isUnmounted) {
+            return;
+          }
+          if (cleanup) {
+            cleanup();
+          }
+          return source(onCleanup);
+        };
+      }
+    } else {
+      getter = () => {
+      };
+    }
+    if (cb && deep) {
+      const baseGetter = getter;
+      getter = () => traverse(baseGetter());
+    }
+    let cleanup;
+    let onCleanup = (fn) => {
+      cleanup = effect2.onStop = () => {
+        fn();
+      };
+    };
+    let oldValue = isMultiSource ? [] : {};
+    const job = () => {
+      if (!effect2.active) {
+        return;
+      }
+      if (cb) {
+        const newValue = effect2.run();
+        if (deep || forceTrigger || (isMultiSource ? newValue.some((v, i) => hasChanged(v, oldValue[i])) : hasChanged(newValue, oldValue))) {
+          if (cleanup) {
+            cleanup();
+          }
+          cb(newValue, oldValue, onCleanup);
+          oldValue = newValue;
+        }
+      } else {
+        effect2.run();
+      }
+    };
+    let scheduler = () => queueJob(job);
+    const effect2 = new ReactiveEffect(getter, scheduler);
+    if (cb) {
+      if (immediate) {
+        job();
+      } else {
+        oldValue = effect2.run();
+      }
+    } else {
+      effect2.run();
+    }
+    return () => {
+      effect2.stop();
+    };
+  }
+  function traverse(value, seen) {
+    if (!isObject(value)) {
+      return value;
+    }
+    seen = seen || /* @__PURE__ */ new Set();
+    if (seen.has(value)) {
+      return value;
+    }
+    seen.add(value);
+    if (isRef(value)) {
+      traverse(value.value, seen);
+    } else if (isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        traverse(value[i], seen);
+      }
+    } else if (isObject(value)) {
+      for (const key in value) {
+        traverse(value[key], seen);
+      }
+    }
+    return value;
   }
 
   // packages/runtime-dom/src/nodeOps.ts

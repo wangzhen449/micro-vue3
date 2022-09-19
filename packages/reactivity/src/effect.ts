@@ -32,6 +32,8 @@ export class ReactiveEffect {
   parent: ReactiveEffect | undefined = undefined // 为了嵌套effect，标记上层activeEffect
 
   private deferStop?: boolean // 延迟清理的标识
+
+  onStop: () => void // stop时会执行
   constructor(public fn, public scheduler: EffectScheduler | null = null) {
     recordEffectScope(this)
   }
@@ -69,7 +71,9 @@ export class ReactiveEffect {
     } else if (this.active) {
       // 是否是激活状态
       cleanupEffect(this)
-
+      if (this.onStop) {
+        this.onStop()
+      }
       // 置为未激活状态
       this.active = false
     }
