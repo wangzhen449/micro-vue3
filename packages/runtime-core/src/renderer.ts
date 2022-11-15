@@ -10,6 +10,7 @@ import { queueJob } from './scheduler'
 import { updateProps } from './componentProps'
 import { updateSlots } from './componentSlots'
 import { isKeepAlive } from './components/KeepAlive'
+import { createAppAPI } from './apiCreateApp'
 
 // 参数 RendererOptions<HostNode, HostElement>
 export const createRenderer = (options) => {
@@ -968,10 +969,9 @@ export const createRenderer = (options) => {
     o: options
   }
 
-  let createApp = () => {}
   return {
     render,
-    createApp
+    createApp: createAppAPI(render)
   }
 }
 

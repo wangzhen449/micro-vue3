@@ -6,7 +6,7 @@
  *    createRender(rendererOptions).createApp(component).mount(dom)
  */
 import { createRenderer } from '@vue/runtime-core'
-import { extend } from '@vue/shared'
+import { extend, isString } from '@vue/shared'
 import { nodeOps } from './nodeOps'
 import { patchProp } from './patchProp'
 
@@ -26,9 +26,27 @@ export const render = (...args) => {
 
 export const createApp = (...args) => {
   const app = ensureRenderer().createApp(...args);
-  // 重写mount方法
-  app.mount = () => {}
+
+  const { mount } = app
+  // 重写mount方法，规范化容器
+  app.mount = (containerOrSelector) => {
+    const container = normalizeContainer(containerOrSelector)
+    if (!container) return
+
+    // 清空容器
+    container.innerHTML = ''
+    mount(container)
+  }
   return app
+}
+
+// 规范化容器，只处理字符串
+function normalizeContainer(container) {
+  if (isString(container)) {
+    const dom = document.querySelector(container)
+    return dom
+  }
+  return container
 }
 
 export * from '@vue/runtime-core'

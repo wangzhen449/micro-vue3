@@ -156,6 +156,7 @@ function createBaseVNode(
 ) {
   const vnode = {
     __v_isVNode: true, // 是否是vnode的标识
+    appContext: null, // app实例
     el: null, // 虚拟dom绑定的真实dom
     type,
     props,

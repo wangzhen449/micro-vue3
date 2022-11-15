@@ -2,7 +2,21 @@ var VueRuntimeDom = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
   var __export = (target, all) => {
     for (var name in all)
       __defProp(target, name, { get: all[name], enumerable: true });
@@ -727,6 +741,7 @@ var VueRuntimeDom = (() => {
   function createBaseVNode(type, props = null, children = null, patchFlag = 0, dynamicProps = null, shapeFlag = type === Fragment ? 0 : 1 /* ELEMENT */, isBlockNode = false, needFullChildrenNormalization = false) {
     const vnode = {
       __v_isVNode: true,
+      appContext: null,
       el: null,
       type,
       props,
@@ -1146,6 +1161,80 @@ var VueRuntimeDom = (() => {
       shapeFlag -= 512 /* COMPONENT_KEPT_ALIVE */;
     }
     vnode.shapeFlag = shapeFlag;
+  }
+
+  // packages/runtime-core/src/apiCreateApp.ts
+  function createAppContext() {
+    return {
+      app: null,
+      mixins: [],
+      components: {},
+      directives: {}
+    };
+  }
+  function createAppAPI(render2) {
+    return function createApp2(rootComponent, rootProps = null) {
+      if (!isFunction(rootComponent)) {
+        rootComponent = __spreadValues({}, rootComponent);
+      }
+      if (rootProps != null && !isObject(rootProps)) {
+        rootProps = null;
+      }
+      const context = createAppContext();
+      const installedPliguns = /* @__PURE__ */ new Set();
+      let isMounted = false;
+      const app = context.app = {
+        _component: rootComponent,
+        _container: null,
+        use(plugin, ...options) {
+          if (installedPliguns.has(plugin)) {
+            console.warn("plugin has");
+          } else if (plugin && isFunction(plugin.install)) {
+            installedPliguns.add(plugin);
+            plugin.install(app, ...options);
+          } else if (isFunction(plugin)) {
+            installedPliguns.add(plugin);
+            plugin(app, ...options);
+          }
+          return app;
+        },
+        mixin(mixin) {
+          if (!context.mixins.includes(mixin)) {
+            context.mixins.push(mixin);
+          }
+          return app;
+        },
+        component(name, component) {
+          if (!component) {
+            return context.components[name];
+          }
+          context.components[name] = component;
+          return app;
+        },
+        directive(name, directive) {
+          if (!directive) {
+            return context.directives[name];
+          }
+          context.directives[name] = directive;
+          return app;
+        },
+        mount(rootContainer) {
+          if (!isMounted) {
+            const vnode = createVNode(rootComponent, rootProps);
+            vnode.appContext = context;
+            render2(vnode, rootContainer);
+            app._container = rootContainer;
+            isMounted = true;
+          }
+        },
+        unmount() {
+          if (isMounted) {
+            render2(null, app._container);
+          }
+        }
+      };
+      return app;
+    };
   }
 
   // packages/runtime-core/src/renderer.ts
@@ -1613,11 +1702,9 @@ var VueRuntimeDom = (() => {
       n: getNextHostNode,
       o: options
     };
-    let createApp2 = () => {
-    };
     return {
       render: render2,
-      createApp: createApp2
+      createApp: createAppAPI(render2)
     };
   };
   function getSequence(arr) {
@@ -2039,10 +2126,23 @@ var VueRuntimeDom = (() => {
   };
   var createApp = (...args) => {
     const app = ensureRenderer().createApp(...args);
-    app.mount = () => {
+    const { mount } = app;
+    app.mount = (containerOrSelector) => {
+      const container = normalizeContainer(containerOrSelector);
+      if (!container)
+        return;
+      container.innerHTML = "";
+      mount(container);
     };
     return app;
   };
+  function normalizeContainer(container) {
+    if (isString(container)) {
+      const dom = document.querySelector(container);
+      return dom;
+    }
+    return container;
+  }
   return __toCommonJS(src_exports);
 })();
 //# sourceMappingURL=runtime-dom.global.js.map
